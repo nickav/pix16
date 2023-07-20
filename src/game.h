@@ -1,7 +1,5 @@
 #pragma once
 
-#define COLOR_RED 0xffff0000
-
 struct Controller
 {
     b32 up;
@@ -32,47 +30,46 @@ struct Game_Output
     // TODO(nick): sound
 };
 
-//
-// NOTE(nick): closer to what a "real" graphics backend is doing
-// But then you can't express the "GetPixel" function as easily
-//
-
-#if 0
-struct Vertex
+union Color
 {
-    Vector2 pos;
-    u32 color;
+    struct {
+        u8 r, g, b, a;
+    };
 
-    //Texture tex;
-    //Vector2 uv;
+    u32 value;
 };
 
-struct Triangle
+struct Image
 {
-    Vertex vertices[3];
+    Vector2i size;
+    Color *pixels;
 };
 
-struct Triangle_List
+struct Font_Glyph
 {
-    Triangle *data;
-    u32 count;
-    u32 capacity;
+    u32 character;
+    Vector2i pos;
+    Vector2i size;
 };
 
-struct Game_Output
+struct Font
 {
-    Triangle_List triangles;
-
-    // TODO(nick): sound
+    Image image;
+    Font_Glyph glyphs[256];
 };
-#endif
 
 void DrawRect(Game_Output *out, Rectangle2 r, u32 color);
-void DrawCircle(Game_Output *out, Rectangle2 r, u32 color);
-void DrawLine(Game_Output *out, Vector2 p0, Vector2 p1, u32 color);
-
 void DrawSetPixel(Game_Output *out, Vector2 pos, u32 color);
 u32 DrawGetPixel(Game_Output *out, Vector2 pos);
+
+void DrawImage(Game_Output *out, Rectangle2 r, Image image);
+void DrawImageExt(Game_Output *out, Rectangle2 r, Image image, Rectangle2 uv);
+
+void DrawCircle(Game_Output *out, Rectangle2 r, u32 color);
+void DrawLine(Game_Output *out, Vector2 p0, Vector2 p1, u32 color);
+void DrawTriangle(Game_Output *out, Vector2 p0, Vector2 p1, Vector2 p1, u32 color);
+
+void DrawText(Game_Output *out, Font *font, String text, Vector2 pos, u32 color);
 
 //
 // API
