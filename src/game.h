@@ -13,12 +13,21 @@ struct Controller
     b32 pause;
 };
 
+struct Image
+{
+    String name;
+    Vector2i size;
+    u32 *pixels;
+};
+
 struct Game_Input
 {
     f32 dt;
     f32 time;
 
     Controller controllers[4];
+
+    Image images[256];
 };
 
 struct Game_Output
@@ -28,21 +37,6 @@ struct Game_Output
     u32 *pixels;
 
     // TODO(nick): sound
-};
-
-union Color
-{
-    struct {
-        u8 r, g, b, a;
-    };
-
-    u32 value;
-};
-
-struct Image
-{
-    Vector2i size;
-    Color *pixels;
 };
 
 struct Font_Glyph
@@ -58,6 +52,16 @@ struct Font
     Font_Glyph glyphs[256];
 };
 
+//
+// API
+//
+
+void GameUpdateAndRender(Game_Input *input, Game_Output *out);
+
+//
+// Drawing API
+//
+
 void DrawRect(Game_Output *out, Rectangle2 r, u32 color);
 void DrawSetPixel(Game_Output *out, Vector2 pos, u32 color);
 u32 DrawGetPixel(Game_Output *out, Vector2 pos);
@@ -67,12 +71,6 @@ void DrawImageExt(Game_Output *out, Rectangle2 r, Image image, Rectangle2 uv);
 
 void DrawCircle(Game_Output *out, Rectangle2 r, u32 color);
 void DrawLine(Game_Output *out, Vector2 p0, Vector2 p1, u32 color);
-void DrawTriangle(Game_Output *out, Vector2 p0, Vector2 p1, Vector2 p1, u32 color);
+void DrawTriangle(Game_Output *out, Vector2 p0, Vector2 p1, Vector2 p2, u32 color);
 
 void DrawText(Game_Output *out, Font *font, String text, Vector2 pos, u32 color);
-
-//
-// API
-//
-
-void GameUpdateAndRender(Game_Input *input, Game_Output *out);

@@ -615,8 +615,6 @@ STBSP__PUBLICDEF int STB_SPRINTF_DECORATE(vsprintfcb)(STBSP_SPRINTFCB *callback,
       // :NativeStringMod
       case 'S':
          str = va_arg(va, Print_String);
-         printf("hello!\n");
-         fflush(stdout);
 
          if (str.count == 0) {
             s = (char *)"null";

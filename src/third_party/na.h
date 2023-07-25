@@ -3146,7 +3146,7 @@ function bool os_init()
     os_time();
     os_sleep(0);
 
-    static HANDLE stdout_handle = GetStdHandle(STD_OUTPUT_HANDLE);
+    HANDLE stdout_handle = GetStdHandle(STD_OUTPUT_HANDLE);
     if (!stdout_handle) {
         AttachConsole(ATTACH_PARENT_PROCESS);
     }

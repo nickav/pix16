@@ -34,6 +34,7 @@ static void win32__print(const char *format, ...) {
 #include "third_party/na_math.h"
 #include "game.h"
 #include "game.cpp"
+#include "pix16_win32_audio.cpp"
 
 //
 // NOTE(nick): win32 entry code
@@ -63,6 +64,7 @@ struct Win32_Framebuffer
 //
 global b32 win32_window_is_fullscreen = false;
 global Win32_Framebuffer win32_framebuffer = {0};
+static b32 should_quit = false;
 
 function void
 win32_toggle_fullscreen(HWND hwnd)
@@ -150,12 +152,17 @@ win32_resize_framebuffer(Win32_Framebuffer *it, int width, int height)
     return true;
 }
 
-
 function LRESULT CALLBACK
 win32_window_callback(HWND hwnd, UINT message, WPARAM w_param, LPARAM l_param)
 {
     switch (message)
     {
+        case WM_CLOSE:
+        {
+            should_quit = true;
+            return DefWindowProcW(hwnd, message, w_param, l_param);
+        } break;
+
         case WM_PAINT:
         {
             RECT wr;
@@ -375,6 +382,12 @@ int APIENTRY WinMain(HINSTANCE instance, HINSTANCE prev_inst, LPSTR argv, int ar
 {
     os_init();
 
+    Audio_Context ctx = {};
+    ctx.samples_per_second = 48000;
+    ctx.num_channels       = 2;
+    ctx.callback           = audio_test_jingle;
+    audio_init(&ctx);
+
     // NOTE(nick): Set DPI Awareness
     HMODULE user32 = LoadLibraryA("user32.dll");
 
@@ -412,7 +425,7 @@ int APIENTRY WinMain(HINSTANCE instance, HINSTANCE prev_inst, LPSTR argv, int ar
 
     win32_fatal_assert(RegisterClassExW(&wc), "Failed to register window class.");
 
-    print("Hello, %S!", S("World"));
+    print("Hello, %S!\n", S("World"));
 
     M_Temp scratch = GetScratch(0, 0);
 
@@ -473,7 +486,7 @@ int APIENTRY WinMain(HINSTANCE instance, HINSTANCE prev_inst, LPSTR argv, int ar
     f64 max_dt = 0.0;
     i64 frame_index = 0;
 
-    while (true)
+    while (!should_quit)
     {
         //f64 target_dt = (1.0 / window_get_refresh_rate(window));
         f64 target_dt = (1.0 / 60.0);
@@ -610,6 +623,8 @@ int APIENTRY WinMain(HINSTANCE instance, HINSTANCE prev_inst, LPSTR argv, int ar
             }
         }
     }
+
+    // TODO(nick): fade out audio here quickly to prevent a popping sound
 
     os_exit(0);
 
