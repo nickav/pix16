@@ -64,7 +64,10 @@ struct Win32_Framebuffer
 //
 global b32 win32_window_is_fullscreen = false;
 global Win32_Framebuffer win32_framebuffer = {0};
+
 static b32 should_quit = false;
+static i32 game_width = 320;
+static i32 game_height = 240;
 
 function void
 win32_toggle_fullscreen(HWND hwnd)
@@ -165,13 +168,41 @@ win32_window_callback(HWND hwnd, UINT message, WPARAM w_param, LPARAM l_param)
 
         case WM_PAINT:
         {
-            RECT wr;
-            GetClientRect(hwnd, &wr);
-            int width = (int)(wr.right - wr.left);
-            int height = (int)(wr.bottom - wr.top);
-
+            //
             // NOTE(nick): this will invalidate any drawing that has happened in the window!
-            win32_resize_framebuffer(&win32_framebuffer, 320, 240);
+            //
+            // We always want the framebuffer to be a fixed size (maybe user configurable?)
+            // because it's supposed to look like a pixel art game.
+            //
+            win32_resize_framebuffer(&win32_framebuffer, game_width, game_height);
+
+            //
+            // Re-render here, otherwise because this event blocks while the user
+            // is resizing the window, the window will remain black.
+            // This is an asethetic choice, so you can disable it if you want to.
+            //
+            #if 1
+            {
+                RECT wr = {0};
+                GetClientRect(hwnd, &wr);
+                int window_width = (int)(wr.right - wr.left);
+                int window_height = (int)(wr.bottom - wr.top);
+
+                Win32_Framebuffer *framebuffer = &win32_framebuffer;
+
+                Rectangle2i dest_rect = aspect_ratio_fit(game_width, game_height, window_width, window_height);
+
+                HDC hdc = GetDC(hwnd);
+
+                StretchDIBits(hdc,
+                    dest_rect.x0, dest_rect.y0, r2i_width(dest_rect), r2i_height(dest_rect),
+                    0, 0, framebuffer->width, framebuffer->height, framebuffer->pixels,
+                    &framebuffer->bitmap_info,
+                    DIB_RGB_COLORS, SRCCOPY);
+
+                ReleaseDC(hwnd, hdc);
+            }
+            #endif
 
             return DefWindowProcW(hwnd, message, w_param, l_param);
         } break;
@@ -430,7 +461,7 @@ int APIENTRY WinMain(HINSTANCE instance, HINSTANCE prev_inst, LPSTR argv, int ar
     M_Temp scratch = GetScratch(0, 0);
 
     u32 scale = 2;
-    Vector2i size = v2i(scale * 320, scale * 240);
+    Vector2i size = v2i(scale * game_width, scale * game_height);
     String16 title16 = string16_from_string(scratch.arena, S("Pix16"));
 
     HWND hwnd = CreateWindowW(
@@ -570,11 +601,6 @@ int APIENTRY WinMain(HINSTANCE instance, HINSTANCE prev_inst, LPSTR argv, int ar
 
         //
         // NOTE(nick): present framebuffer
-        // @Incomplete: should we double-buffer this?
-        //
-        // @WTF: what is actually happening with StretchDIBits?
-        // Why does it not work the way we think it should?
-        // Meaning, I need to fill it every frame, how would I skip rendering for a frame with it?
         //
         {
             RECT wr = {0};
@@ -584,15 +610,13 @@ int APIENTRY WinMain(HINSTANCE instance, HINSTANCE prev_inst, LPSTR argv, int ar
 
             Win32_Framebuffer *framebuffer = &win32_framebuffer;
 
-            Rectangle2i dest_rect = aspect_ratio_fit(320, 240, window_width, window_height);
+            Rectangle2i dest_rect = aspect_ratio_fit(game_width, game_height, window_width, window_height);
 
             StretchDIBits(hdc,
                 dest_rect.x0, dest_rect.y0, r2i_width(dest_rect), r2i_height(dest_rect),
                 0, 0, framebuffer->width, framebuffer->height, framebuffer->pixels,
                 &framebuffer->bitmap_info,
                 DIB_RGB_COLORS, SRCCOPY);
-
-            //SwapBuffers(hdc);
         }
 
         now = os_time();

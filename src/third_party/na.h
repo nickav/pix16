@@ -3150,7 +3150,7 @@ function bool os_init()
     if (!stdout_handle) {
         AttachConsole(ATTACH_PARENT_PROCESS);
     }
-
+    
     win32_global_arena = arena_alloc(Gigabytes(1));
 
     SetUnhandledExceptionFilter(win32_crash_handler);
