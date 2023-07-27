@@ -78,15 +78,15 @@ VERSION HISTORY
 //
 
 #if defined(_MSC_VER)
-    #define COMPILER_CL 1
+    #define COMPILER_MSVC 1
 #elif defined(__clang__)
     #define COMPILER_CLANG 1
 #elif defined(__GNUC__) || defined(__GNUG__)
     #define COMPILER_GCC 1
 #endif
 
-#if !defined(COMPILER_CL)
-    #define COMPILER_CL 0
+#if !defined(COMPILER_MSVC)
+    #define COMPILER_MSVC 0
 #endif
 #if !defined(COMPILER_GCC)
     #define COMPILER_GCC 0
@@ -137,7 +137,7 @@ VERSION HISTORY
     #endif
 #endif
 
-#if COMPILER_CL
+#if COMPILER_MSVC
     #define thread_local __declspec(thread)
 #elif COMPILER_CLANG
     #define thread_local __thread
@@ -145,7 +145,7 @@ VERSION HISTORY
     #define thread_local __thread
 #endif
 
-#if COMPILER_CL && _MSC_VER < 1900 // COMPILER_CL_YEAR < 2015
+#if COMPILER_MSVC && _MSC_VER < 1900 // COMPILER_CL_YEAR < 2015
     #define __function__ "unknown"
 #else
     #define __function__ __func__
@@ -397,7 +397,7 @@ int na__assert(bool cond, const char *expr, const char *file, long int line, cha
         printf("\n");
         fflush(stdout);
 
-        #if COMPILER_MSVC
+        #if 0
         __debugbreak();
         #endif
 
@@ -975,11 +975,11 @@ struct Mutex {
 function u32 thread_get_id();
 
 #if COMPILER_MSVC
-    #define read_barrier() _ReadBarrier()
-    #define write_barrier() _WriteBarrier()
+    #define atomic_read_barrier() _ReadBarrier()
+    #define atomic_write_barrier() _WriteBarrier()
 #else
-    #define read_barrier() asm volatile("" ::: "memory")
-    #define write_barrier() asm volatile("" ::: "memory")
+    #define atomic_read_barrier() asm volatile("" ::: "memory")
+    #define atomic_write_barrier() asm volatile("" ::: "memory")
 #endif
 
 // Atomics
@@ -1022,6 +1022,7 @@ function void mutex_destroy(Mutex *mutex);
     #define NOMINMAX
     #include <windows.h>
     #include <Shlobj.h>
+    #include <intrin.h>
     #pragma pop_macro("function")
     #pragma pop_macro("Free")
 

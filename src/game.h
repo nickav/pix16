@@ -36,7 +36,8 @@ struct Game_Output
     i32 height;
     u32 *pixels;
 
-    // TODO(nick): sound
+    i32 sample_count;
+    i16 *samples;
 };
 
 struct Font_Glyph
@@ -62,15 +63,18 @@ void GameUpdateAndRender(Game_Input *input, Game_Output *out);
 // Drawing API
 //
 
-void DrawRect(Game_Output *out, Rectangle2 r, u32 color);
-void DrawSetPixel(Game_Output *out, Vector2 pos, u32 color);
+void DrawSetPixel(Game_Output *out, Vector2 pos, Vector4 color);
 u32 DrawGetPixel(Game_Output *out, Vector2 pos);
+
+void DrawRect(Game_Output *out, Rectangle2 r, Vector4 color);
+
+void DrawCircle(Game_Output *out, Rectangle2 r, Vector4 color);
+
+void DrawLine(Game_Output *out, Vector2 p0, Vector2 p1, Vector4 color);
+
+void DrawTriangle(Game_Output *out, Vector2 p0, Vector2 p1, Vector2 p2, Vector4 color);
 
 void DrawImage(Game_Output *out, Rectangle2 r, Image image);
 void DrawImageExt(Game_Output *out, Rectangle2 r, Image image, Rectangle2 uv);
 
-void DrawCircle(Game_Output *out, Rectangle2 r, u32 color);
-void DrawLine(Game_Output *out, Vector2 p0, Vector2 p1, u32 color);
-void DrawTriangle(Game_Output *out, Vector2 p0, Vector2 p1, Vector2 p2, u32 color);
-
-void DrawText(Game_Output *out, Font *font, String text, Vector2 pos, u32 color);
+void DrawText(Game_Output *out, Font *font, String text, Vector2 pos, Vector4 color);

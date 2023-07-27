@@ -361,13 +361,12 @@ function void win32_poll_xinput_controllers(Game_Input *input)
         {
             XINPUT_GAMEPAD *pad = &state.Gamepad;
 
+            // NOTE(nick): vibrate when controller is connected
             static u32 vibrate_count = 5;
             if (controller_connected_frame_index[index] <= vibrate_count)
             {
-                f32 left_motor = controller_connected_frame_index[index] < vibrate_count ?  0.5 : 0;
-                f32 right_motor = 0;
-
-                Swap(f32, left_motor, right_motor);
+                f32 left_motor = 0;
+                f32 right_motor = controller_connected_frame_index[index] < vibrate_count ?  0.5 : 0;
 
                 left_motor = Clamp(left_motor, 0, 1);
                 right_motor = Clamp(right_motor, 0, 1);
@@ -412,12 +411,6 @@ function void win32_poll_xinput_controllers(Game_Input *input)
 int APIENTRY WinMain(HINSTANCE instance, HINSTANCE prev_inst, LPSTR argv, int argc)
 {
     os_init();
-
-    Audio_Context ctx = {};
-    ctx.samples_per_second = 48000;
-    ctx.num_channels       = 2;
-    ctx.callback           = audio_test_jingle;
-    audio_init(&ctx);
 
     // NOTE(nick): Set DPI Awareness
     HMODULE user32 = LoadLibraryA("user32.dll");
@@ -508,6 +501,8 @@ int APIENTRY WinMain(HINSTANCE instance, HINSTANCE prev_inst, LPSTR argv, int ar
 
     win32_init_xinput();
 
+    win32_audio_init();
+
     ShowWindow(hwnd, SW_SHOW);
 
     f64 then = os_time();
@@ -519,14 +514,14 @@ int APIENTRY WinMain(HINSTANCE instance, HINSTANCE prev_inst, LPSTR argv, int ar
 
     while (!should_quit)
     {
-        //f64 target_dt = (1.0 / window_get_refresh_rate(window));
+        // NOTE(nick): running at 60 fps locked because this is more similar to retro consoles
         f64 target_dt = (1.0 / 60.0);
 
         f64 now = os_time();
         f64 dt = now - then;
         then = now;
 
-        // Debug frame timings
+        // NOTE(nick): Debug frame timings
         {
             if (frame_index % 100 == 10)
             {
@@ -564,40 +559,39 @@ int APIENTRY WinMain(HINSTANCE instance, HINSTANCE prev_inst, LPSTR argv, int ar
         arena_reset(temp_arena());
 
         static Game_Input input = {};
-
-        input.dt = 1.0 / 60.0f;
-        input.time = os_time();
-
-        MemoryZero(&input.controllers, count_of(input.controllers) * sizeof(Controller));
-        win32_poll_xinput_controllers(&input);
-
         {
-            Controller *player0 = &input.controllers[0];
+            input.dt = target_dt;
+            input.time = os_time();
 
-            player0->up    |= (GetKeyState(VK_UP) & (1 << 15)) == (1 << 15);
-            player0->down  |= (GetKeyState(VK_DOWN) & (1 << 15)) == (1 << 15);
-            player0->left  |= (GetKeyState(VK_LEFT) & (1 << 15)) == (1 << 15);
-            player0->right |= (GetKeyState(VK_RIGHT) & (1 << 15)) == (1 << 15);
+            MemoryZero(&input.controllers, count_of(input.controllers) * sizeof(Controller));
+            win32_poll_xinput_controllers(&input);
 
-            player0->up    |= (GetKeyState('W') & (1 << 15)) == (1 << 15);
-            player0->down  |= (GetKeyState('S') & (1 << 15)) == (1 << 15);
-            player0->left  |= (GetKeyState('A') & (1 << 15)) == (1 << 15);
-            player0->right |= (GetKeyState('D') & (1 << 15)) == (1 << 15);
+            {
+                Controller *player0 = &input.controllers[0];
 
-            player0->start |= (GetKeyState(VK_ESCAPE) & (1 << 15)) == (1 << 15);
-            player0->pause |= (GetKeyState('P') & (1 << 15)) == (1 << 15);
+                player0->up    |= (GetKeyState(VK_UP) & (1 << 15)) == (1 << 15);
+                player0->down  |= (GetKeyState(VK_DOWN) & (1 << 15)) == (1 << 15);
+                player0->left  |= (GetKeyState(VK_LEFT) & (1 << 15)) == (1 << 15);
+                player0->right |= (GetKeyState(VK_RIGHT) & (1 << 15)) == (1 << 15);
+
+                player0->up    |= (GetKeyState('W') & (1 << 15)) == (1 << 15);
+                player0->down  |= (GetKeyState('S') & (1 << 15)) == (1 << 15);
+                player0->left  |= (GetKeyState('A') & (1 << 15)) == (1 << 15);
+                player0->right |= (GetKeyState('D') & (1 << 15)) == (1 << 15);
+
+                player0->start |= (GetKeyState(VK_ESCAPE) & (1 << 15)) == (1 << 15);
+                player0->pause |= (GetKeyState('P') & (1 << 15)) == (1 << 15);
+            }
+
+            // TODO(nick): also merge keyboard state to players 1 and 2
         }
 
-        // TODO(nick): also merge keyboard state to players 1 and 2
-
         static Game_Output output = {};
-        output.pixels = PushArrayZero(temp_arena(), u32, win32_framebuffer.width * win32_framebuffer.height);
-        output.width = win32_framebuffer.width;
+        output.pixels = win32_framebuffer.pixels;
+        output.width  = win32_framebuffer.width;
         output.height = win32_framebuffer.height;
 
         GameUpdateAndRender(&input, &output);
-
-        MemoryCopy(win32_framebuffer.pixels, output.pixels, sizeof(u32) * win32_framebuffer.width * win32_framebuffer.height);
 
         //
         // NOTE(nick): present framebuffer
@@ -647,8 +641,6 @@ int APIENTRY WinMain(HINSTANCE instance, HINSTANCE prev_inst, LPSTR argv, int ar
             }
         }
     }
-
-    // TODO(nick): fade out audio here quickly to prevent a popping sound
 
     os_exit(0);
 
