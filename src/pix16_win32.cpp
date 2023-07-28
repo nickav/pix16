@@ -591,7 +591,42 @@ int APIENTRY WinMain(HINSTANCE instance, HINSTANCE prev_inst, LPSTR argv, int ar
         output.width  = win32_framebuffer.width;
         output.height = win32_framebuffer.height;
 
+        u32 SamplesPerSecond = win32_audio.samples_per_second;
+        u32 SampleCount = win32_audio.sample_count;
+        u32 BufferCount = win32_audio.buffer_count;
+        u32 BufferSize = win32_audio.buffer_size;
+        u32 SamplesPerBuffer = win32_audio.samples_per_buffer;
+
+        u32 CurrentOffset = win32_audio.queued_samples;
+        u32 TargetOffset = win32_audio.written_samples + SamplesPerBuffer * BufferCount;
+
+        i32 NumFrames = 0;
+        if (CurrentOffset < TargetOffset)
+        {
+            NumFrames = (((i32)TargetOffset - (i32)CurrentOffset) / SamplesPerBuffer);
+        }
+
+        u32 UserSampleCount = NumFrames * SampleCount;
+        i16 *UserSamples = win32_audio.user_samples;
+        
+        output.samples_per_second = SamplesPerSecond;
+        output.sample_count = UserSampleCount;
+        output.samples = UserSamples;
+
         GameUpdateAndRender(&input, &output);
+
+        u32 UserSampleOffset = 0;
+        while (CurrentOffset < TargetOffset)
+        {
+            u32 SampleOffset = win32_audio.queued_samples % (2 * BufferCount * SamplesPerBuffer);
+            i16 *OutputSamples = (i16 *)((u8 *)(win32_audio.samples) + SampleOffset * 2 * sizeof(i16));
+
+            MemoryCopy(OutputSamples, (u8 *)(UserSamples) + UserSampleOffset, SampleCount * 2 * sizeof(i16));
+            UserSampleOffset += SampleCount * 2 * sizeof(i16);
+
+            win32_audio.queued_samples += SampleCount;
+            CurrentOffset = win32_audio.queued_samples;
+        }
 
         //
         // NOTE(nick): present framebuffer

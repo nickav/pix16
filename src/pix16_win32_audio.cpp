@@ -1,22 +1,4 @@
-struct Audio_Context;
-
-#define AUDIO_CALLBACK(name) void name(Audio_Context *ctx, void *samples, u32 sample_count, void *user)
-typedef AUDIO_CALLBACK(Audio_Callback);
-
-struct Audio_Context
-{
-    // Input
-    u32 num_channels;
-    u32 samples_per_second;
-
-    Audio_Callback *callback;
-    void *user_data;
-
-    // Output
-    u32 bits_per_channel;
-    u32 output_sample_position;
-    u32 latency_samples;
-};
+#pragma once
 
 #include <mmsystem.h>
 #include <mmdeviceapi.h>
@@ -40,10 +22,9 @@ typedef MMRESULT timeBeginPeriod_t(UINT uPeriod);
 typedef HANDLE AvSetMmThreadCharacteristicsW_t(LPCWSTR TaskName, LPDWORD TaskIndex);
 typedef BOOL AvRevertMmThreadCharacteristics_t(HANDLE AvrtHandle);
 
+
 struct Win32_Audio_Context
 {
-    Audio_Context *ctx;
-
     CoInitializeEx_t   *CoInitializeEx;
     CoCreateInstance_t *CoCreateInstance;
     CoTaskMemFree_t    *CoTaskMemFree;
@@ -60,82 +41,140 @@ struct Win32_Audio_Context
     AvRevertMmThreadCharacteristics_t *AvRevertMmThreadCharacteristics;
 
     DWORD thread_id;
-    //u64 output_position;
+
+    // NOTE(nick): output info
+    u32 samples_per_second;
+    u32 bits_per_channel;
+    u32 num_channels;
+    u32 latency_samples;
+    u32 samples_per_buffer;
+    u32 buffer_size;
+    u32 buffer_count;
+    u32 sample_count;
+
+    u32 played_samples;
+    u32 queued_samples;
+    u32 written_samples;
+
+    i16 *samples;
+    u32 sample_offset;
+    u32 sample_size;
+
+    i16 *user_samples;
 };
 
 static Win32_Audio_Context win32_audio = {};
 
-//
-// Winmm backend
-//
+function void audio_output_sine_wave_i16(u32 samples_per_second, u32 sample_count, f32 tone_hz, i32 tone_volume, i16 *samples);
+function void audio_test_jingle(u32 samples_per_second, void *samples, u32 sample_count, void *user);
 
-bool winmm__submit_empty_audio(HWAVEOUT WaveOut, WAVEHDR *Header, u32 SampleCount) {
-    bool result = false;
-    
-    i16 *Samples = (i16 *)Header->lpData;
-    MemoryZero(Samples, SampleCount);
-
-    DWORD error = win32_audio.waveOutPrepareHeader(WaveOut, Header, sizeof(*Header));
-    if (error == MMSYSERR_NOERROR)
-    {
-        error = win32_audio.waveOutWrite(WaveOut, Header, sizeof(*Header));
-        if (error == MMSYSERR_NOERROR)
-        {
-            result = true;
-        }
-    }
-    
-    return result;
-}
-
-bool winmm__submit_audio(HWAVEOUT WaveOut, WAVEHDR *Header, u32 SampleCount, f32 *mix_buffer) {
-    bool Result = false;
-    
-    /*
-    u32 mix_buffer_size = SampleCount*2*sizeof(f32);
-    memory_zero(mix_buffer, mix_buffer_size);
-    */
-    
-    i16 *Samples = (i16 *)Header->lpData;
-
-    Audio_Context *ctx = win32_audio.ctx;
-    if (ctx->callback)
-    {
-       ctx->callback(ctx, Samples, SampleCount, ctx->user_data);
-    }
-
-    DWORD error = win32_audio.waveOutPrepareHeader(WaveOut, Header, sizeof(*Header));
-    if (error == MMSYSERR_NOERROR)
-    {
-        error = win32_audio.waveOutWrite(WaveOut, Header, sizeof(*Header));
-        if (error == MMSYSERR_NOERROR)
-        {
-            Result = true;
-        }
-    }
-    
-    return Result;
-}
-
-void winmm__run(Audio_Context *ctx)
+DWORD win32_audio_thread(void *user)
 {
+    b32 quit = false;
+
+    //
+    // NOTE(nick): load required DLLs
+    //
+
+    HMODULE ole32lib = LoadLibraryA("ole32.dll");
+    if (ole32lib)
+    {
+        win32_audio.CoInitializeEx = (CoInitializeEx_t *)GetProcAddress(ole32lib, "CoInitializeEx");
+        win32_audio.CoCreateInstance = (CoCreateInstance_t *)GetProcAddress(ole32lib, "CoCreateInstance");
+        win32_audio.CoTaskMemFree = (CoTaskMemFree_t *)GetProcAddress(ole32lib, "CoTaskMemFree");
+    }
+    else
+    {
+        print("[audio] Failed to load ole32.dll\n");
+        quit = true;
+    }
+
+    HMODULE winmmlib = LoadLibraryA("winmm.dll");
+    if (winmmlib)
+    {
+        win32_audio.waveOutOpen = (waveOutOpen_t *)GetProcAddress(winmmlib, "waveOutOpen");
+        win32_audio.waveOutClose = (waveOutClose_t *)GetProcAddress(winmmlib, "waveOutClose");
+        win32_audio.waveOutWrite = (waveOutWrite_t *)GetProcAddress(winmmlib, "waveOutWrite");
+        win32_audio.waveOutPrepareHeader = (waveOutPrepareHeader_t *)GetProcAddress(winmmlib, "waveOutPrepareHeader");
+        win32_audio.waveOutUnprepareHeader = (waveOutUnprepareHeader_t *)GetProcAddress(winmmlib, "waveOutUnprepareHeader");
+        win32_audio.waveOutGetPosition = (waveOutGetPosition_t *)GetProcAddress(winmmlib, "waveOutGetPosition");
+        win32_audio.timeBeginPeriod = (timeBeginPeriod_t *)GetProcAddress(winmmlib, "timeBeginPeriod");
+    }
+    else
+    {
+        print("[audio] Failed to load winmm.dll\n");
+        quit = true;
+    }
+
+    HMODULE avrtlib = LoadLibraryA("avrt.dll");
+    if (avrtlib)
+    {
+        win32_audio.AvSetMmThreadCharacteristicsW = (AvSetMmThreadCharacteristicsW_t *)GetProcAddress(avrtlib, "AvSetMmThreadCharacteristicsW");
+        win32_audio.AvRevertMmThreadCharacteristics = (AvRevertMmThreadCharacteristics_t *)GetProcAddress(avrtlib, "AvRevertMmThreadCharacteristics");
+    }
+    else
+    {
+        print("[audio] Warning, failed to load avrt.dll\n");
+    }
+
+    if (quit)
+    {
+        if (ole32lib)
+        {
+            FreeLibrary(ole32lib);
+        }
+
+        if (winmmlib)
+        {
+            FreeLibrary(winmmlib);
+        }
+
+        MemoryZero(&win32_audio, sizeof(Win32_Audio_Context));
+        print("[audio] Failed to load required DLLs\n");
+    }
+
+    DWORD index = 0;
+    HANDLE task = 0;
+    if (win32_audio.AvSetMmThreadCharacteristicsW)
+    {
+        task = win32_audio.AvSetMmThreadCharacteristicsW(L"Pro Audio", &index);
+    }
+
     //
     // NOTE(casey): Set up our audio output buffer
     //
-    u32 SamplesPerSecond = ctx->samples_per_second;
-    u32 SamplesPerBuffer = 16*SamplesPerSecond/1000;
-    u32 ChannelCount = ctx->num_channels;
-    u32 BytesPerChannelValue = ctx->bits_per_channel/8;
+    u32 BitsPerChannel = 16;
+    u32 SamplesPerSecond = 48000;
+    u32 SamplesPerBuffer = BitsPerChannel*SamplesPerSecond/1000;
+    u32 ChannelCount = 2;
+    u32 BytesPerChannelValue = BitsPerChannel/8;
     u32 BytesPerSample = ChannelCount*BytesPerChannelValue;
     
     u32 BufferCount = 4;
     u32 BufferSize = SamplesPerBuffer*BytesPerSample;
     u32 HeaderSize = sizeof(WAVEHDR);
     u32 TotalBufferSize = (BufferSize+HeaderSize);
-    u32 MixBufferSize = (SamplesPerBuffer*ChannelCount*sizeof(f32));
+    u32 MixBufferSize = (BufferCount * SamplesPerBuffer*ChannelCount*sizeof(i16));
     u32 TotalAudioMemorySize = BufferCount*TotalBufferSize + MixBufferSize;
 
-    ctx->latency_samples = BufferCount * BufferSize;
+    u32 NextBufferIndexToPlay = 0;
+    u32 SampleCount = SamplesPerBuffer;
+
+    win32_audio.samples_per_second = SamplesPerSecond;
+    win32_audio.bits_per_channel = BitsPerChannel;
+    win32_audio.num_channels = ChannelCount;
+    win32_audio.latency_samples = BufferCount * BufferSize;
+    win32_audio.samples_per_buffer = SamplesPerBuffer;
+    win32_audio.buffer_size = BufferSize;
+    win32_audio.buffer_count = BufferCount;
+    win32_audio.played_samples = 0;
+
+    win32_audio.samples = (i16 *)VirtualAlloc(0, 2*BufferCount*BufferSize, MEM_COMMIT, PAGE_READWRITE);
+    win32_audio.sample_offset = 0;
+    win32_audio.sample_size = 2*BufferCount*BufferSize;
+    win32_audio.sample_count = SampleCount;
+
+    win32_audio.user_samples = (i16 *)VirtualAlloc(0, 2*BufferCount*BufferSize, MEM_COMMIT, PAGE_READWRITE);
 
     //
     // NOTE(casey): Initialize audio out
@@ -149,8 +188,6 @@ void winmm__run(Audio_Context *ctx)
     Format.nSamplesPerSec = SamplesPerSecond;
     Format.nBlockAlign = (Format.nChannels*Format.wBitsPerSample)/8;
     Format.nAvgBytesPerSec = Format.nBlockAlign * Format.nSamplesPerSec;
-    
-    bool quit = false;
     
     void *MixBuffer = 0;
     void *AudioBufferMemory = 0;
@@ -169,10 +206,9 @@ void winmm__run(Audio_Context *ctx)
                 WAVEHDR *Header = (WAVEHDR *)At;
                 Header->lpData = (char *)(Header + 1);
                 Header->dwBufferLength = BufferSize;
+                Header->dwFlags |= WHDR_DONE;
                 
                 At += TotalBufferSize;
-                
-                winmm__submit_empty_audio(WaveOut, Header, SamplesPerBuffer);
             }
         }
         else
@@ -191,31 +227,56 @@ void winmm__run(Audio_Context *ctx)
     // NOTE(casey): Serve audio forever (until we are told to stop)
     //
 
-    for (;!quit;)
+    while (!quit)
     {
-        MSG Message = {};
-        GetMessage(&Message, 0, 0, 0);
-        if (Message.message == MM_WOM_DONE)
-        {
-            // @Incomplete: we might want this to happen more than every MM_WOM_DONE message?
-            MMTIME time;
-            time.wType = TIME_SAMPLES;
-            win32_audio.waveOutGetPosition(WaveOut, &time, sizeof(time));
-            // NOTE(nick): subtract initial empty queued buffers size
-            u32 played_samples = time.u.sample - SamplesPerBuffer * BufferCount;
-            win32_audio.ctx->output_sample_position = played_samples;
-            
+        MMTIME time;
+        time.wType = TIME_SAMPLES;
+        win32_audio.waveOutGetPosition(WaveOut, &time, sizeof(time));
+        u32 played_samples = time.u.sample;
+        win32_audio.played_samples = played_samples;
 
-            WAVEHDR *Header = (WAVEHDR *)Message.lParam;
-            if (Header->dwFlags & WHDR_DONE)
-            {
-                Header->dwFlags &= ~WHDR_DONE;
-            }
+        u32 BufferIndex = NextBufferIndexToPlay;
+        u8 *At = (u8 *)MixBuffer;
+        At += MixBufferSize;
+        At += TotalBufferSize * BufferIndex;
+
+        WAVEHDR *Header = (WAVEHDR *)At;
+        b32 done = (Header->dwFlags & WHDR_DONE);
+
+        if (done)
+        {
+            i16 *Samples = (i16 *)Header->lpData;
+
+            u32 SampleOffset = win32_audio.written_samples % (2 * BufferCount * SamplesPerBuffer);
+            i16 *OutputSamples = (i16 *)((u8 *)(win32_audio.samples) + SampleOffset * 2 * sizeof(i16));
+            MemoryCopy(Samples, OutputSamples, SampleCount * ChannelCount * sizeof(i16));
+            win32_audio.written_samples += SampleCount;
 
             win32_audio.waveOutUnprepareHeader(WaveOut, Header, sizeof(*Header));
-            
-            winmm__submit_audio(WaveOut, Header, SamplesPerBuffer, (f32*)MixBuffer);
+
+            DWORD error = win32_audio.waveOutPrepareHeader(WaveOut, Header, sizeof(*Header));
+            if (error == MMSYSERR_NOERROR)
+            {
+                error = win32_audio.waveOutWrite(WaveOut, Header, sizeof(*Header));
+                if (error == MMSYSERR_NOERROR)
+                {
+                    //Result = true;
+                }
+            }
+
+            NextBufferIndexToPlay += 1;
+            NextBufferIndexToPlay %= BufferCount;
         }
+        
+        // NOTE(nick): this call blocks waiting for new messages
+        MSG Message = {};
+        GetMessage(&Message, 0, 0, 0);
+    }
+
+    if (task)
+    {
+        win32_audio.AvRevertMmThreadCharacteristics(task);
+        task = 0;
     }
     
     if (WaveOut)
@@ -227,56 +288,8 @@ void winmm__run(Audio_Context *ctx)
     {
         VirtualFree(AudioBufferMemory, 0, MEM_RELEASE);
     }
-}
 
-DWORD win32_audio_thread(void *user)
-{
-    Audio_Context *ctx = win32_audio.ctx;
-    {
-        HMODULE ole32lib = LoadLibraryA("ole32.dll");
-        if (ole32lib)
-        {
-            win32_audio.CoInitializeEx = (CoInitializeEx_t *)GetProcAddress(ole32lib, "CoInitializeEx");
-            win32_audio.CoCreateInstance = (CoCreateInstance_t *)GetProcAddress(ole32lib, "CoCreateInstance");
-            win32_audio.CoTaskMemFree = (CoTaskMemFree_t *)GetProcAddress(ole32lib, "CoTaskMemFree");
-        }
-
-        HMODULE winmmlib = LoadLibraryA("winmm.dll");
-        if (winmmlib)
-        {
-            win32_audio.waveOutOpen = (waveOutOpen_t *)GetProcAddress(winmmlib, "waveOutOpen");
-            win32_audio.waveOutClose = (waveOutClose_t *)GetProcAddress(winmmlib, "waveOutClose");
-            win32_audio.waveOutWrite = (waveOutWrite_t *)GetProcAddress(winmmlib, "waveOutWrite");
-            win32_audio.waveOutPrepareHeader = (waveOutPrepareHeader_t *)GetProcAddress(winmmlib, "waveOutPrepareHeader");
-            win32_audio.waveOutUnprepareHeader = (waveOutUnprepareHeader_t *)GetProcAddress(winmmlib, "waveOutUnprepareHeader");
-            win32_audio.waveOutGetPosition = (waveOutGetPosition_t *)GetProcAddress(winmmlib, "waveOutGetPosition");
-            win32_audio.timeBeginPeriod = (timeBeginPeriod_t *)GetProcAddress(winmmlib, "timeBeginPeriod");
-        }
-
-        HMODULE avrtlib = LoadLibraryA("avrt.dll");
-        if (avrtlib)
-        {
-            win32_audio.AvSetMmThreadCharacteristicsW = (AvSetMmThreadCharacteristicsW_t *)GetProcAddress(avrtlib, "AvSetMmThreadCharacteristicsW");
-            win32_audio.AvRevertMmThreadCharacteristics = (AvRevertMmThreadCharacteristics_t *)GetProcAddress(avrtlib, "AvRevertMmThreadCharacteristics");
-        }
-    }
-
-    DWORD index = 0;
-    HANDLE task = 0;
-    if (win32_audio.AvSetMmThreadCharacteristicsW)
-    {
-        task = win32_audio.AvSetMmThreadCharacteristicsW(L"Pro Audio", &index);
-    }
-
-    winmm__run(win32_audio.ctx);
-
-    if (task)
-    {
-        win32_audio.AvRevertMmThreadCharacteristics(task);
-        task = 0;
-    }
-    
-    return(0);
+    return 0;
 }
 
 function void audio_output_sine_wave_i16(u32 samples_per_second, u32 sample_count, f32 tone_hz, i32 tone_volume, i16 *samples)
@@ -299,10 +312,8 @@ function void audio_output_sine_wave_i16(u32 samples_per_second, u32 sample_coun
     }
 }
 
-function void audio_test_jingle(Audio_Context *ctx, void *samples, u32 sample_count, void *user)
+function void audio_test_jingle(u32 samples_per_second, void *samples, u32 sample_count, void *user)
 {
-    u32 samples_per_second = ctx->samples_per_second;
-
     f32 tone_hz = 440;
     {
         static u64 total_samples_written = 0;
@@ -324,25 +335,31 @@ function void audio_test_jingle(Audio_Context *ctx, void *samples, u32 sample_co
     audio_output_sine_wave_i16(samples_per_second, sample_count, tone_hz, tone_volume, (i16 *)samples);
 }
 
-function bool audio_init(Audio_Context *ctx)
+function bool win32_audio_init()
 {
-    win32_audio.ctx = ctx;
-
-    ctx->bits_per_channel = 16;
-    ctx->output_sample_position = 0;
-    ctx->latency_samples = 0;
-
-    // TODO(nick): support buffer other formats
-    assert(ctx->samples_per_second == 48000);
-    assert(ctx->bits_per_channel == 16);
-    assert(ctx->num_channels == 2);
-
-    DWORD thread_id = 0;
-    HANDLE handle = CreateThread(0, 0, win32_audio_thread, 0, 0, &thread_id);
+    HANDLE handle = CreateThread(0, 0, win32_audio_thread, 0, 0, &win32_audio.thread_id);
     SetThreadPriority(handle, THREAD_PRIORITY_TIME_CRITICAL);
     CloseHandle(handle);
 
-    win32_audio.thread_id = thread_id;
-
     return true;
+}
+
+#if 0
+function Win32_Audio_Frame win32_audio_get_frame()
+{
+    MMTIME time;
+    time.wType = TIME_SAMPLES;
+    win32_audio.waveOutGetPosition(WaveOut, &time, sizeof(time));
+
+    i32 played_samples = time.u.sample;
+    // NOTE(nick): subtract initial empty queued buffers size
+    played_samples -= SamplesPerBuffer * BufferCount;
+
+    win32_audio.cursor = played_samples;
+}
+#endif
+
+function void win32_audio_shutdown()
+{
+    // TODO(nick): fade out audio here quickly to prevent a popping sound
 }

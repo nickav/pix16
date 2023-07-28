@@ -43,6 +43,8 @@ void DrawRect(Game_Output *out, Rectangle2 rect, Vector4 color)
     }
 }
 
+function void audio_output_sine_wave_i16(u32 samples_per_second, u32 sample_count, f32 tone_hz, i32 tone_volume, i16 *samples);
+
 void GameUpdateAndRender(Game_Input *input, Game_Output *out)
 {
     static Vector2 pos = {0};
@@ -71,4 +73,7 @@ void GameUpdateAndRender(Game_Input *input, Game_Output *out)
 
     DrawSetPixel(out, v2(0, 0), v4_yellow);
     DrawSetPixel(out, v2(1, 1), v4_blue);
+
+
+    audio_output_sine_wave_i16(out->samples_per_second, out->sample_count, 440.0f, 3000, out->samples);
 }

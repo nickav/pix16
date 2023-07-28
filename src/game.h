@@ -36,6 +36,7 @@ struct Game_Output
     i32 height;
     u32 *pixels;
 
+    i32 samples_per_second;
     i32 sample_count;
     i16 *samples;
 };

@@ -3334,7 +3334,7 @@ function u64 os_page_size() {
 }
 
 function void *os_reserve(u64 size) {
-    return VirtualAlloc(0, size, MEM_RESERVE, PAGE_READWRITE);
+    return VirtualAlloc(0, size, MEM_RESERVE, PAGE_NOACCESS);
 }
 
 function bool os_commit(void *ptr, u64 size) {
