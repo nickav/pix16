@@ -79,3 +79,13 @@ void DrawImage(Game_Output *out, Rectangle2 r, Image image);
 void DrawImageExt(Game_Output *out, Rectangle2 r, Image image, Rectangle2 uv);
 
 void DrawText(Game_Output *out, Font *font, String text, Vector2 pos, Vector4 color);
+
+//
+// Sound API
+//
+
+void PlaySine(Game_Output *out, f32 tone_hz, f32 volume);
+void PlayTriangle(Game_Output *out, f32 tone_hz, f32 volume);
+void PlaySquare(Game_Output *out, f32 tone_hz, f32 volume);
+void PlayNoise(Game_Output *out, f32 tone_hz, f32 volume);
+
