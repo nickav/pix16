@@ -627,6 +627,9 @@ int APIENTRY WinMain(HINSTANCE instance, HINSTANCE prev_inst, LPSTR argv, int ar
 
             win32_audio.queued_samples += SampleCount;
             CurrentOffset = win32_audio.queued_samples;
+
+            NumFrames -= 1;
+            if (NumFrames <= 0) break;
         }
 
         //
