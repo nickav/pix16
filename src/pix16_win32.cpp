@@ -604,6 +604,7 @@ int APIENTRY WinMain(HINSTANCE instance, HINSTANCE prev_inst, LPSTR argv, int ar
         if (CurrentOffset < TargetOffset)
         {
             NumFrames = (((i32)TargetOffset - (i32)CurrentOffset) / SamplesPerBuffer);
+            if (NumFrames > 4) NumFrames = 4;
         }
 
         u32 UserSampleCount = NumFrames * SampleCount;
