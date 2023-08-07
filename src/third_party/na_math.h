@@ -2045,10 +2045,10 @@ function Vector4 v4_from_u32(u32 hex)
 function u32 u32_from_v4(Vector4 v)
 {
     u32 result =
-        ((u32)(v.a * 255.0f)) << 24 |
-        ((u32)(v.r * 255.0f)) << 16 |
-        ((u32)(v.g * 255.0f)) << 8  |
-        ((u32)(v.b * 255.0f)) << 0;
+        ((u32)(v.a * 255.0f) & 0xff) << 24 |
+        ((u32)(v.r * 255.0f) & 0xff) << 16 |
+        ((u32)(v.g * 255.0f) & 0xff) << 8  |
+        ((u32)(v.b * 255.0f) & 0xff) << 0;
     return result;
 }
 
