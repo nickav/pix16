@@ -55,6 +55,19 @@ struct Font
     Font_Glyph glyphs[256];
 };
 
+struct Sound
+{
+    u16 bits_per_sample; // should always be 32
+    u16 num_channels; // should always be 2
+    u16 sample_rate; // should always be 48000
+    u32 bytes_per_second; // computed: sample_rate * (bits_per_sample / 8) * num_channels
+
+    u32 total_samples;
+    i16 *samples;
+
+    u32 sample_offset; // samples played so far
+};
+
 //
 // API
 //
@@ -90,4 +103,4 @@ void PlayTriangle(Game_Output *out, f32 tone_hz, f32 volume);
 void PlaySquare(Game_Output *out, f32 tone_hz, f32 volume);
 void PlayNoise(Game_Output *out, f32 tone_hz, f32 volume);
 
-//void PlaySound(Game_Output *out, );
+void PlaySound(Game_Output *out, Sound *sound);
