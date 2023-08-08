@@ -302,8 +302,8 @@ function void audio_output_sine_wave_i16(u32 samples_per_second, u32 sample_coun
     {
         f32 sine_value   = sin_f32(t_sine);
         i16 sample_value = (i16)(sine_value * tone_volume);
-        *sample_out++ = sample_value;
-        *sample_out++ = sample_value;
+        *sample_out++ += sample_value;
+        *sample_out++ += sample_value;
 
         t_sine += TAU / (f32)wave_period;
         if (t_sine >= TAU) {

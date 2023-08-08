@@ -43,7 +43,26 @@ void DrawRect(Game_Output *out, Rectangle2 rect, Vector4 color)
     }
 }
 
-function void audio_output_sine_wave_i16(u32 samples_per_second, u32 sample_count, f32 tone_hz, i32 tone_volume, i16 *samples);
+void PlaySine(Game_Output *out, f32 tone_hz, f32 volume)
+{
+    int wave_period = out->samples_per_second / tone_hz;
+    f32 t_sine = out->samples_played * TAU / (f32)wave_period;
+    t_sine = Mod(t_sine, TAU);
+
+    i16 *sample_out = out->samples;
+    for (int sample_index = 0; sample_index < out->sample_count; sample_index++)
+    {
+        f32 sine_value   = sin_f32(t_sine);
+        i16 sample_value = (i16)(sine_value * volume);
+        *sample_out++ += sample_value;
+        *sample_out++ += sample_value;
+
+        t_sine += TAU / (f32)wave_period;
+        if (t_sine >= TAU) {
+            t_sine -= TAU;
+        }
+    }
+}
 
 void GameUpdateAndRender(Game_Input *input, Game_Output *out)
 {
@@ -75,5 +94,14 @@ void GameUpdateAndRender(Game_Input *input, Game_Output *out)
     DrawSetPixel(out, v2(1, 1), v4_blue);
 
 
-    audio_output_sine_wave_i16(out->samples_per_second, out->sample_count, 440.0f, 3000, out->samples);
+    if (ctrl0->right)
+    {
+        PlaySine(out, 440.0f, 3000);
+    }
+
+    if (ctrl0->left)
+    {
+        PlaySine(out, 523.25f, 3000);
+        PlaySine(out, 783.99f, 3000);
+    }
 }

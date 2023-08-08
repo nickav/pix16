@@ -564,9 +564,12 @@ int APIENTRY WinMain(HINSTANCE instance, HINSTANCE prev_inst, LPSTR argv, int ar
             input.time = os_time();
 
             MemoryZero(&input.controllers, count_of(input.controllers) * sizeof(Controller));
-            win32_poll_xinput_controllers(&input);
 
+            b32 window_is_focused = hwnd == GetForegroundWindow();
+            if (window_is_focused)
             {
+                win32_poll_xinput_controllers(&input);
+
                 Controller *player0 = &input.controllers[0];
 
                 player0->up    |= (GetKeyState(VK_UP) & (1 << 15)) == (1 << 15);
@@ -582,8 +585,6 @@ int APIENTRY WinMain(HINSTANCE instance, HINSTANCE prev_inst, LPSTR argv, int ar
                 player0->start |= (GetKeyState(VK_ESCAPE) & (1 << 15)) == (1 << 15);
                 player0->pause |= (GetKeyState('P') & (1 << 15)) == (1 << 15);
             }
-
-            // TODO(nick): also merge keyboard state to players 1 and 2
         }
 
         static Game_Output output = {};
@@ -609,12 +610,15 @@ int APIENTRY WinMain(HINSTANCE instance, HINSTANCE prev_inst, LPSTR argv, int ar
 
         u32 UserSampleCount = NumFrames * SampleCount;
         i16 *UserSamples = win32_audio.user_samples;
+        MemoryZero(UserSamples, UserSampleCount * 2 * sizeof(i16));
         
         output.samples_per_second = SamplesPerSecond;
         output.sample_count = UserSampleCount;
         output.samples = UserSamples;
 
         GameUpdateAndRender(&input, &output);
+
+        output.samples_played += UserSampleCount;
 
         u32 UserSampleOffset = 0;
         while (CurrentOffset < TargetOffset)
