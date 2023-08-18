@@ -36,6 +36,8 @@ static void win32__print(const char *format, ...) {
 #include "game.cpp"
 #include "pix16_win32_audio.cpp"
 
+#include "user.cpp"
+
 //
 // NOTE(nick): win32 entry code
 //

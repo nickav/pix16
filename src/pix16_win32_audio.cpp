@@ -144,7 +144,7 @@ DWORD win32_audio_thread(void *user)
     // NOTE(casey): Set up our audio output buffer
     //
     u32 BitsPerChannel = 16;
-    u32 SamplesPerSecond = 48000;
+    u32 SamplesPerSecond = 44100;
     u32 SamplesPerBuffer = BitsPerChannel*SamplesPerSecond/1000;
     u32 ChannelCount = 2;
     u32 BytesPerChannelValue = BitsPerChannel/8;

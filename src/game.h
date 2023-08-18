@@ -17,16 +17,16 @@ struct Mouse
 {
     b32 left;
     b32 right;
-    
+
     Vector2 position;
 };
 
 struct Image
 {
-    String name;
     Vector2i size;
     u32 *pixels;
     
+    String name;
     u64 hash;
 };
 
@@ -35,12 +35,14 @@ struct Sound
     u16 bits_per_sample; // should always be 32
     u16 num_channels; // should always be 2
     u16 sample_rate; // should always be 48000
-    u32 bytes_per_second; // computed: sample_rate * (bits_per_sample / 8) * num_channels
 
     u32 total_samples;
     i16 *samples;
 
     u32 sample_offset; // samples played so far
+
+    String name;
+    u64 hash;
 };
 
 struct Game_Input
@@ -118,7 +120,7 @@ void PlayTriangle(Game_Output *out, f32 tone_hz, f32 volume);
 void PlaySquare(Game_Output *out, f32 tone_hz, f32 volume);
 void PlayNoise(Game_Output *out, f32 tone_hz, f32 volume);
 
-void PlaySound(Game_Output *out, Sound *sound);
+void PlaySoundStream(Game_Output *out, Sound *sound);
 
 //
 // Assets API
@@ -127,5 +129,5 @@ void PlaySound(Game_Output *out, Sound *sound);
 Image LoadImage(Game_Input *input, String path);
 void FreeImage(Game_Input *input, String path);
 
-Sound LoadSound(Game_Input *input, String path);
+Sound *LoadSound(Game_Input *input, String path);
 void FreeSound(Game_Input *input, String path);

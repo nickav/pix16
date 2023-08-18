@@ -3,6 +3,9 @@
 #define STB_IMAGE_IMPLEMENTATION
 #include "third_party/stb_image.h"
 
+#define DR_WAV_IMPLEMENTATION
+#include "third_party/dr_wav.h"
+
 void DrawSetPixel(Game_Output *out, Vector2 pos, Vector4 color)
 {
     i32 in_x = Clamp((i32)pos.x, 0, out->width);
@@ -287,11 +290,6 @@ Image LoadImage(Game_Input *input, String path)
                 result->pixels      = (u32 *)stbi_load_from_memory(contents.data, contents.count, &width, &height, &channels, 4);
                 result->size.width  = width;
                 result->size.height = height;
-
-                u32 *at = result->pixels;
-                for (i32 i = 0; i < width * height; i ++)
-                {
-                }
             }
             else
             {
@@ -409,116 +407,117 @@ void DrawImageExt(Game_Output *out, Image image, Rectangle2 rect, Rectangle2 uv)
     }
 }
 
-void GameUpdateAndRender(Game_Input *input, Game_Output *out)
+Sound *LoadSound(Game_Input *input, String path)
 {
-    static i32 slide_index = 0;
+    u64 hash = murmur64(path.data, path.count);
 
-    static b32 did_advance_slides = false;
-
-    Controller *ctrl0 = &input->controllers[0];
-    if (ctrl0->b)
+    Sound *result = NULL;
+    for (i64 index = 0; index < count_of(input->sounds); index += 1)
     {
-        if (!did_advance_slides)
+        Sound *it = &input->sounds[index];
+        if (it->hash == hash)
         {
-            DrawRect(out, r2(v2(0, 0), v2(out->width, out->height)), v4_black);
-            slide_index += 1;
-            did_advance_slides = true;
+            result = it;
+            break;
         }
     }
-    else if (ctrl0->a)
+
+    if (!result)
     {
-        if (!did_advance_slides)
+        for (i64 index = 0; index < count_of(input->sounds); index += 1)
         {
-            DrawRect(out, r2(v2(0, 0), v2(out->width, out->height)), v4_black);
-            slide_index -= 1;
-            did_advance_slides = true;
-        }
-    }
-    else
-    {
-        did_advance_slides = false;
-    }
-
-    u32 num_slides = 0;
-
-    if (slide_index == num_slides)
-    {
-        DrawRect(out, r2(v2(0, 0), v2(out->width, out->height)), v4_black);
-
-        DrawTriangleExt(out,
-            v2(out->width * 0.5, 0), v4_red,
-            input->mouse.position, v4_green,
-            v2(out->width, out->height), v4_blue);
-    }
-    num_slides += 1;
-
-    if (slide_index == num_slides)
-    {
-        DrawRect(out, r2(v2(0, 0), v2(out->width, out->height)), v4_black);
-        DrawRectExt(out, r2(v2(0, 0), v2(out->width, out->height)), v4_red, v4_green, v4_white, v4_blue);
-    }
-    num_slides += 1;
-
-    if (slide_index == num_slides)
-    {
-        DrawRect(out, r2(v2(0, 0), v2(out->width, out->height)), v4_black);
-
-        static Vector2 pos = {0};
-
-        if (ctrl0->right)
-        {
-            pos.x += input->dt * 400;
-        }
-        if (ctrl0->left)
-        {
-            pos.x -= input->dt * 400;
-        }
-        if (ctrl0->up)
-        {
-            pos.y -= input->dt * 400;
-        }
-        if (ctrl0->down)
-        {
-            pos.y += input->dt * 400;
+            Sound *it = &input->sounds[index];
+            if (it->hash == 0)
+            {
+                result = it;
+                break;
+            }
         }
 
-        DrawTriangle(out, v2(16, 16), v2(128, 0), v2(200, 200), v4_magenta);
-
-        DrawRect(out, r2(pos + v2(0, 0), pos + v2(32, 32)), v4_red);
-
-        DrawSetPixel(out, v2(0, 0), v4_yellow);
-        DrawSetPixel(out, v2(1, 1), v4_blue);
-
-        Image image = LoadImage(input, S("../data/guy.png"));
-        DrawImage(out, image, v2(64, 64));
-
-        DrawImageExt(out, image, r2(v2(128, 128), v2(256, 256)), r2(v2(0, 0), v2(1, 1)));
-
-        DrawCircle(out, v2(200, 32), 32, v4_blue);
+        if (!result)
+        {
+            print("[LoadSound] Used all %d slots available! Failed to load sound: %.*s\n", count_of(input->sounds), LIT(path));
+        }
     }
-    num_slides += 1;
 
-    if (slide_index == num_slides)
+    if (result)
     {
-        DrawRect(out, r2(v2(0, 0), v2(out->width, out->height)), v4_black);
+        if (result->hash == 0)
+        {
+            M_Temp scratch = GetScratch(0, 0);
 
-        Image image = LoadImage(input, S("../data/guy.png"));
-        DrawImageExt(out, image, r2(v2(0, 0), v2(out->width, out->height)), r2(v2(0, 0), v2(2, 2)));
+            String contents = os_read_entire_file(scratch.arena, path);
+
+            if (contents.count > 0)
+            {
+                unsigned int channels;
+                unsigned int sample_rate;
+                drwav_uint64 total_pcm_frame_count;
+                i16 *samples = drwav_open_memory_and_read_pcm_frames_s16(contents.data, contents.count, &channels, &sample_rate, &total_pcm_frame_count, NULL);
+
+                result->bits_per_sample = 32;
+                result->num_channels = channels;
+                result->sample_rate = sample_rate;
+                result->total_samples = total_pcm_frame_count;
+                result->samples = samples;
+                result->sample_offset = 0;
+
+                assert(channels == 2);
+                assert(sample_rate == 44100);
+            }
+            else
+            {
+                print("[LoadSound] Sound not found: %.*s\n", LIT(path));
+            }
+
+            result->name = path;
+            result->hash = hash;
+
+            ReleaseScratch(scratch);
+        }
     }
-    num_slides += 1;
 
+    return result;
+}
 
-    if (slide_index < 0) slide_index += num_slides;
-    if (slide_index >= num_slides) slide_index -= num_slides;
+void FreeSound(Game_Input *input, String path)
+{
+    u64 hash = murmur64(path.data, path.count);
 
-    if (ctrl0->right)
+    Sound *result = NULL;
+    for (i64 index = 0; index < count_of(input->sounds); index += 1)
     {
-        PlaySine(out, 440.0f, 3000);
+        Sound *it = &input->sounds[index];
+        if (it->hash == hash)
+        {
+            free(it->samples); 
+            it->samples = 0;
+
+            it->hash = 0;
+            MemoryZeroStruct(it);
+
+            break;
+        }
+    }
+}
+
+void PlaySoundStream(Game_Output *out, Sound *sound)
+{
+    i16 *samples = out->samples;
+    i16 *at = (i16 *)((u8 *)sound->samples + sound->sample_offset * sizeof(i16) * 2);
+
+    u32 samples_remaining = sound->total_samples - sound->sample_offset;
+
+    u32 sample_count = Min(out->sample_count, samples_remaining);
+
+    for (int sample_index = 0; sample_index < sample_count; sample_index++)
+    {
+        *samples++ += *at;
+        at += 1;
+
+        *samples++ += *at;
+        at += 1;
     }
 
-    if (ctrl0->left)
-    {
-        PlaySine(out, 523.25f, 3000);
-        PlaySine(out, 783.99f, 3000);
-    }
+    sound->sample_offset += sample_count;
 }
