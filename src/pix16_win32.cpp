@@ -560,8 +560,44 @@ int APIENTRY WinMain(HINSTANCE instance, HINSTANCE prev_inst, LPSTR argv, int ar
 
         static Game_Input input = {};
         {
+            static Arena *permanant_storage = NULL;
+            if (!permanant_storage)
+            {
+                permanant_storage = arena_alloc(Megabytes(4));
+            }
+
+            input.arena = permanant_storage;
             input.dt = target_dt;
             input.time = os_time();
+
+            //
+            // Mouse
+            //
+
+            POINT point;
+            if (GetCursorPos(&point))
+            {
+                if (ScreenToClient(hwnd, &point))
+                {
+                    RECT wr = {};
+                    GetClientRect(hwnd, &wr);
+                    int window_width = (int)(wr.right - wr.left);
+                    int window_height = (int)(wr.bottom - wr.top);
+
+                    Rectangle2i dest_rect = aspect_ratio_fit(game_width, game_height, window_width, window_height);
+
+                    input.mouse.position = v2(
+                        game_width * ((point.x - dest_rect.x0) / (f32)r2i_width(dest_rect)),
+                        game_height * ((point.y - dest_rect.y0) / (f32)r2i_height(dest_rect)));
+                }
+            }
+            input.mouse.left = ((GetKeyState(VK_LBUTTON) & 0x8000) != 0);
+            input.mouse.right = ((GetKeyState(VK_RBUTTON) & 0x8000) != 0);
+
+
+            //
+            // Controllers
+            //
 
             MemoryZero(&input.controllers, count_of(input.controllers) * sizeof(Controller));
 
@@ -576,11 +612,15 @@ int APIENTRY WinMain(HINSTANCE instance, HINSTANCE prev_inst, LPSTR argv, int ar
                 player0->down  |= (GetKeyState(VK_DOWN) & (1 << 15)) == (1 << 15);
                 player0->left  |= (GetKeyState(VK_LEFT) & (1 << 15)) == (1 << 15);
                 player0->right |= (GetKeyState(VK_RIGHT) & (1 << 15)) == (1 << 15);
+                player0->a     |= (GetKeyState('X') & (1 << 15)) == (1 << 15);
+                player0->b     |= (GetKeyState('C') & (1 << 15)) == (1 << 15);
 
                 player0->up    |= (GetKeyState('W') & (1 << 15)) == (1 << 15);
                 player0->down  |= (GetKeyState('S') & (1 << 15)) == (1 << 15);
                 player0->left  |= (GetKeyState('A') & (1 << 15)) == (1 << 15);
                 player0->right |= (GetKeyState('D') & (1 << 15)) == (1 << 15);
+                player0->a     |= (GetKeyState('J') & (1 << 15)) == (1 << 15);
+                player0->b     |= (GetKeyState('K') & (1 << 15)) == (1 << 15);
 
                 player0->start |= (GetKeyState(VK_ESCAPE) & (1 << 15)) == (1 << 15);
                 player0->pause |= (GetKeyState('P') & (1 << 15)) == (1 << 15);

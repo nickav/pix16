@@ -1292,6 +1292,14 @@ function Vector2 r2_size(Rectangle2 r) {
     return v2(r.x1 - r.x0, r.y1 - r.y0);
 }
 
+function f32 r2_width(Rectangle2 r) {
+    return r.x1 - r.x0;
+}
+
+function f32 r2_height(Rectangle2 r) {
+    return r.y1 - r.y0;
+}
+
 function Vector2 r2_center(Rectangle2 r) {
     Vector2 s = r2_size(r);
     return {r.x0 + s.x / 2, r.y0 + s.y / 2};
@@ -2030,25 +2038,63 @@ function Vector3 rgb_from_hsv(Vector3 hsv)
     return rgb;
 }
 
-function Vector4 v4_from_u32(u32 hex)
+function Vector4 argb_v4_from_u32(u32 hex)
 {
-    Vector4 result =
-    {
-        (f32)((hex & 0xff000000) >> 24) / 255.f,
-        (f32)((hex & 0x00ff0000) >> 16) / 255.f,
-        (f32)((hex & 0x0000ff00) >>  8) / 255.f,
-        (f32)((hex & 0x000000ff) >>  0) / 255.f,
-    };
+    Vector4 result = {};
+    result.a = (f32)((hex & 0xff000000) >> 24) / 255.f;
+    result.r = (f32)((hex & 0x00ff0000) >> 16) / 255.f;
+    result.b = (f32)((hex & 0x0000ff00) >>  8) / 255.f;
+    result.g = (f32)((hex & 0x000000ff) >>  0) / 255.f;
     return result;
 }
 
-function u32 u32_from_v4(Vector4 v)
+function u32 argb_u32_from_v4(Vector4 v)
 {
     u32 result =
         ((u32)(v.a * 255.0f) & 0xff) << 24 |
         ((u32)(v.r * 255.0f) & 0xff) << 16 |
         ((u32)(v.g * 255.0f) & 0xff) << 8  |
         ((u32)(v.b * 255.0f) & 0xff) << 0;
+    return result;
+}
+
+function Vector4 rgba_v4_from_u32(u32 hex)
+{
+    Vector4 result = {};
+    result.r = (f32)((hex & 0xff000000) >> 24) / 255.f;
+    result.g = (f32)((hex & 0x00ff0000) >> 16) / 255.f;
+    result.b = (f32)((hex & 0x0000ff00) >>  8) / 255.f;
+    result.a = (f32)((hex & 0x000000ff) >>  0) / 255.f;
+    return result;
+}
+
+function u32 rgba_u32_from_v4(Vector4 v)
+{
+    u32 result =
+        ((u32)(v.r * 255.0f) & 0xff) << 24 |
+        ((u32)(v.g * 255.0f) & 0xff) << 16 |
+        ((u32)(v.b * 255.0f) & 0xff) << 8  |
+        ((u32)(v.a * 255.0f) & 0xff) << 0;
+    return result;
+}
+
+function Vector4 linear_rgb_to_srgb(Vector4 linear_rgb)
+{
+    Vector4 result = {};
+    result.r = Pow(linear_rgb.r, 1.0 / 2.2);
+    result.g = Pow(linear_rgb.g, 1.0 / 2.2);
+    result.b = Pow(linear_rgb.b, 1.0 / 2.2);
+    result.a = linear_rgb.a;
+    return result;
+}
+
+function Vector4 srgb_to_linear_rgb(Vector4 srgb)
+{
+    Vector4 result = {};
+    result.r = Pow(srgb.r, 2.2);
+    result.g = Pow(srgb.g, 2.2);
+    result.b = Pow(srgb.b, 2.2);
+    result.a = srgb.a;
     return result;
 }
 
@@ -2172,6 +2218,23 @@ function b32 line_intersects_circle(Vector2 p1, Vector2 p2, Vector2 circle, f32 
     Vector2 h = v2((ab.x * t + p1.x) - circle.x, (ab.y * t + p1.y) - circle.y);
     f32 h2 = v2_dot(h, h);
     return h2 <= radius * radius;
+}
+
+f32 triangle_sign(Vector2 p1, Vector2 p2, Vector2 p3)
+{
+    return (p1.x - p3.x) * (p2.y - p3.y) - (p2.x - p3.x) * (p1.y - p3.y);
+}
+
+function b32 point_in_triangle(Vector2 point, Vector2 v1, Vector2 v2, Vector2 v3)
+{
+    f32 d1 = triangle_sign(point, v1, v2);
+    f32 d2 = triangle_sign(point, v2, v3);
+    f32 d3 = triangle_sign(point, v3, v1);
+
+    b32 has_neg = (d1 < 0) || (d2 < 0) || (d3 < 0);
+    b32 has_pos = (d1 > 0) || (d2 > 0) || (d3 > 0);
+
+    return !(has_neg && has_pos);
 }
 
 function Vector3 screen_to_ndc(Vector2 window, Vector2 screen)
