@@ -138,7 +138,13 @@ win32_resize_framebuffer(Win32_Framebuffer *it, int width, int height)
     info->bmiHeader.biHeight      = -height; // NOTE(bill): -ve is top-down, +ve is bottom-up
     info->bmiHeader.biPlanes      = 1;
     info->bmiHeader.biBitCount    = 32;
-    info->bmiHeader.biCompression = BI_RGB;
+    info->bmiHeader.biCompression = BI_RGB | BI_BITFIELDS;
+
+    DWORD *pBmi = (DWORD*)info->bmiColors;
+    pBmi[0] = 0x000000FF; // Red mask
+    pBmi[1] = 0x0000FF00; // Green mask
+    pBmi[2] = 0x00FF0000; // Blue mask
+    pBmi[3] = 0x00000000; // Not used (Alpha)
 
     if (it->pixels)
     {

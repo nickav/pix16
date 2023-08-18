@@ -2061,20 +2061,20 @@ function u32 argb_u32_from_v4(Vector4 v)
 function Vector4 rgba_v4_from_u32(u32 hex)
 {
     Vector4 result = {};
-    result.r = (f32)((hex & 0xff000000) >> 24) / 255.f;
-    result.g = (f32)((hex & 0x00ff0000) >> 16) / 255.f;
-    result.b = (f32)((hex & 0x0000ff00) >>  8) / 255.f;
-    result.a = (f32)((hex & 0x000000ff) >>  0) / 255.f;
+    result.a = (f32)((hex & 0xff000000) >> 24) / 255.f;
+    result.b = (f32)((hex & 0x00ff0000) >> 16) / 255.f;
+    result.g = (f32)((hex & 0x0000ff00) >>  8) / 255.f;
+    result.r = (f32)((hex & 0x000000ff) >>  0) / 255.f;
     return result;
 }
 
 function u32 rgba_u32_from_v4(Vector4 v)
 {
     u32 result =
-        ((u32)(v.r * 255.0f) & 0xff) << 24 |
-        ((u32)(v.g * 255.0f) & 0xff) << 16 |
-        ((u32)(v.b * 255.0f) & 0xff) << 8  |
-        ((u32)(v.a * 255.0f) & 0xff) << 0;
+        ((u32)(v.a * 255.0f) & 0xff) << 24 |
+        ((u32)(v.b * 255.0f) & 0xff) << 16 |
+        ((u32)(v.g * 255.0f) & 0xff) << 8  |
+        ((u32)(v.r * 255.0f) & 0xff) << 0;
     return result;
 }
 
