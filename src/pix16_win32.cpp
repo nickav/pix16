@@ -32,6 +32,10 @@ static void win32__print(const char *format, ...) {
 #define impl
 #include "third_party/na.h"
 #include "third_party/na_math.h"
+
+#define PROFILER 1
+#include "profiler.cpp"
+
 #include "game.h"
 #include "game.cpp"
 #include "pix16_win32_audio.cpp"
@@ -666,7 +670,13 @@ int APIENTRY WinMain(HINSTANCE instance, HINSTANCE prev_inst, LPSTR argv, int ar
         output.sample_count = UserSampleCount;
         output.samples = UserSamples;
 
+        profiler__begin();
         GameUpdateAndRender(&input, &output);
+        profiler__end();
+        profiler__print();
+
+        //static i32 frames = 0;
+        //if (frames ++ >= 10) os_exit(0);
 
         output.samples_played += UserSampleCount;
 

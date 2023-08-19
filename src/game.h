@@ -60,7 +60,7 @@ struct Sound
 {
     u16 bits_per_sample; // should always be 32
     u16 num_channels; // should always be 2
-    u16 sample_rate; // should always be 48000
+    u16 sample_rate; // should always be 44100
 
     u32 total_samples;
     i16 *samples;
@@ -131,4 +131,6 @@ f32 SoundGetTime(Game_Output *out, Sound sound);
 
 Image LoadImage(String path);
 Sound LoadSound(String path);
+Font LoadFont(String path);
+
 Font FontMake(Image image, String alphabet, Vector2i monospaced_letter_size);
