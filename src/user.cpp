@@ -97,6 +97,7 @@ void GameUpdateAndRender(Game_Input *input, Game_Output *out)
     num_slides += 1;
 
     Sound sound = LoadSound(input, S("../data/snd_boot_sequence.wav"));
+    #if 0
     static b32 did_reset = false;
     if (ctrl0->down)
     {
@@ -110,8 +111,8 @@ void GameUpdateAndRender(Game_Input *input, Game_Output *out)
     {
         did_reset = false;
     }
-
     PlaySoundStream(out, sound, 1.0);
+    #endif
 
     if (slide_index < 0) slide_index += num_slides;
     if (slide_index >= num_slides) slide_index -= num_slides;
@@ -123,12 +124,24 @@ void GameUpdateAndRender(Game_Input *input, Game_Output *out)
 
     if (ctrl0->left)
     {
-        PlaySine(out, 523.25f, 1.0);
-        PlaySine(out, 783.99f, 1.0);
+        PlaySquare(out, 440.0f, 1.0);
     }
 
     if (ctrl0->up)
     {
-        PlayNoise(out, 0.5);
+        PlayTriangle(out, 440.0f, 1.0);
     }
+
+    if (ctrl0->down)
+    {
+        PlaySawtooth(out, 440.0f, 1.0);
+    }
+
+    #if 0
+    if (ctrl0->left)
+    {
+        PlaySine(out, 523.25f, 1.0);
+        PlaySine(out, 783.99f, 1.0);
+    }
+    #endif
 }

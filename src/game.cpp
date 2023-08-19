@@ -523,7 +523,7 @@ void DrawImageExt(Game_Output *out, Image image, Rectangle2 rect, Rectangle2 uv)
 
 void PlaySine(Game_Output *out, f32 tone_hz, f32 volume)
 {
-    volume = clamp_f32(volume, 0, 1);
+    volume = clamp_f32(volume, 0, 2);
 
     int wave_period = out->samples_per_second / tone_hz;
     f32 t_sine = out->samples_played * TAU / (f32)wave_period;
@@ -544,9 +544,79 @@ void PlaySine(Game_Output *out, f32 tone_hz, f32 volume)
     }
 }
 
+void PlaySquare(Game_Output *out, f32 tone_hz, f32 volume)
+{
+    volume = clamp_f32(volume, 0, 2);
+
+    f32 wave_period = (f32)out->samples_per_second / tone_hz;
+    f32 t_sine = out->samples_played * TAU / wave_period;
+    t_sine = Mod(t_sine, TAU);
+
+    i16 *sample_out = out->samples;
+    for (int sample_index = 0; sample_index < out->sample_count; sample_index++)
+    {
+        f32 sine_value   = t_sine <= PI ? 1.0 : -1.0;
+        i16 sample_value = (i16)(sine_value * volume * MAX_SOUND_SIZE);
+        *sample_out++ += sample_value;
+        *sample_out++ += sample_value;
+
+        t_sine += TAU / (f32)wave_period;
+        if (t_sine >= TAU) {
+            t_sine -= TAU;
+        }
+    }
+}
+
+void PlayTriangle(Game_Output *out, f32 tone_hz, f32 volume)
+{
+    volume = clamp_f32(volume, 0, 2);
+
+    f32 wave_period = (f32)out->samples_per_second / tone_hz;
+    f32 t_sine = out->samples_played * TAU / (f32)wave_period;
+    t_sine = Mod(t_sine, TAU);
+
+    i16 *sample_out = out->samples;
+    for (i32 sample_index = 0; sample_index < out->sample_count; sample_index++)
+    {
+        f32 triangle_value   = 1.0 - 2.0 * abs_f32(t_sine / PI - 1.0);
+
+        i16 sample_value = (i16)(triangle_value * volume * MAX_SOUND_SIZE);
+        *sample_out++ += sample_value;
+        *sample_out++ += sample_value;
+
+        t_sine += TAU / (f32)wave_period;
+        if (t_sine >= TAU) {
+            t_sine -= TAU;
+        }
+    }
+}
+
+void PlaySawtooth(Game_Output *out, f32 tone_hz, f32 volume)
+{
+    volume = clamp_f32(volume, 0, 2);
+
+    f32 wave_period = (f32)out->samples_per_second / tone_hz;
+    f32 t_sine = out->samples_played * TAU / (f32)wave_period;
+    t_sine = Mod(t_sine, TAU);
+
+    i16 *sample_out = out->samples;
+    for (int sample_index = 0; sample_index < out->sample_count; sample_index++)
+    {
+        f32 sawtooth_value   = t_sine / PI - 1.0;
+        i16 sample_value = (i16)(sawtooth_value * volume * MAX_SOUND_SIZE);
+        *sample_out++ += sample_value;
+        *sample_out++ += sample_value;
+
+        t_sine += TAU / (f32)wave_period;
+        if (t_sine >= TAU) {
+            t_sine -= TAU;
+        }
+    }
+}
+
 void PlayNoise(Game_Output *out, f32 volume)
 {
-    volume = clamp_f32(volume, 0, 1);
+    volume = clamp_f32(volume, 0, 2);
 
     Random_State *rng = &g_state.rng;
 
@@ -565,7 +635,7 @@ void PlaySoundStream(Game_Output *out, Sound sound, f32 volume)
     Sound_Asset *asset = (Sound_Asset *)GetAssetByIndex(&g_state.sounds, sizeof(Sound_Asset), count_of(g_state.sounds), sound.index); 
     if (!asset) return;
 
-    volume = clamp_f32(volume, 0, 1);
+    volume = clamp_f32(volume, 0, 2);
 
     i16 *samples = out->samples;
 

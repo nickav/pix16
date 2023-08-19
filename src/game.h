@@ -113,8 +113,9 @@ void DrawText(Game_Output *out, Font *font, String text, Vector2 pos, Vector4 co
 //
 
 void PlaySine(Game_Output *out, f32 tone_hz, f32 volume);
-void PlayTriangle(Game_Output *out, f32 tone_hz, f32 volume);
 void PlaySquare(Game_Output *out, f32 tone_hz, f32 volume);
+void PlayTriangle(Game_Output *out, f32 tone_hz, f32 volume);
+void PlaySawtooth(Game_Output *out, f32 tone_hz, f32 volume);
 void PlayNoise(Game_Output *out, f32 volume);
 
 void PlaySoundStream(Game_Output *out, Sound sound, f32 volume);
