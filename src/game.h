@@ -21,24 +21,6 @@ struct Mouse
     Vector2 position;
 };
 
-struct Image
-{
-    Vector2i size;
-    u32 *pixels;
-    i64 index;
-};
-
-struct Sound
-{
-    u16 bits_per_sample; // should always be 32
-    u16 num_channels; // should always be 2
-    u16 sample_rate; // should always be 48000
-
-    u32 total_samples;
-    i16 *samples;
-    i64 index;
-};
-
 struct Game_Input
 {
     // User Memory
@@ -67,6 +49,24 @@ struct Game_Output
     i32 samples_played;
 };
 
+struct Image
+{
+    Vector2i size;
+    u32 *pixels;
+    i64 index;
+};
+
+struct Sound
+{
+    u16 bits_per_sample; // should always be 32
+    u16 num_channels; // should always be 2
+    u16 sample_rate; // should always be 48000
+
+    u32 total_samples;
+    i16 *samples;
+    i64 index;
+};
+
 struct Font_Glyph
 {
     u32 character;
@@ -77,7 +77,9 @@ struct Font_Glyph
 struct Font
 {
     Image image;
+
     Font_Glyph glyphs[256];
+    u32 glyph_count;
 };
 
 //
@@ -93,20 +95,21 @@ void GameUpdateAndRender(Game_Input *input, Game_Output *out);
 void DrawSetPixel(Game_Output *out, Vector2 pos, Vector4 color);
 u32 DrawGetPixel(Game_Output *out, Vector2 pos);
 
-void DrawRect(Game_Output *out, Rectangle2 r, Vector4 color);
-void DrawRectExt(Game_Output *out, Rectangle2 r, Vector4 c0, Vector4 c1, Vector4 c2, Vector4 c3);
+void DrawRect(Game_Output *out, Rectangle2 rect, Vector4 color);
+void DrawRectExt(Game_Output *out, Rectangle2 rect, Vector4 c0, Vector4 c1, Vector4 c2, Vector4 c3);
 
 void DrawCircle(Game_Output *out, Vector2 pos, f32 radius, Vector4 color);
 
 void DrawTriangle(Game_Output *out, Vector2 p0, Vector2 p1, Vector2 p2, Vector4 color);
 void DrawTriangleExt(Game_Output *out, Vector2 p0, Vector4 c0, Vector2 p1, Vector4 c1, Vector2 p2, Vector4 c2);
 
-void DrawImage(Game_Output *out, Image image, Vector2 pos);
-void DrawImageExt(Game_Output *out, Image image, Rectangle2 r, Rectangle2 uv);
-
 void DrawLine(Game_Output *out, Vector2 p0, Vector2 p1, Vector4 color);
 
-void DrawText(Game_Output *out, Font *font, String text, Vector2 pos, Vector4 color);
+void DrawImage(Game_Output *out, Image image, Vector2 pos);
+void DrawImageExt(Game_Output *out, Image image, Rectangle2 rect, Rectangle2 uv);
+
+void DrawText(Game_Output *out, Font font, String text, Vector2 pos);
+void DrawTextExt(Game_Output *out, Font font, String text, Vector2 pos, Vector4 color);
 
 //
 // Sound API
@@ -126,6 +129,6 @@ f32 SoundGetTime(Game_Output *out, Sound sound);
 // Assets API
 //
 
-Image LoadImage(Game_Input *input, String path);
-Sound LoadSound(Game_Input *input, String path);
-Font  LoadFont(Game_Input *input, Image image, String alphabet);
+Image LoadImageFromPath(String path);
+Sound LoadSoundFromPath(String path);
+Font FontMake(Image image, String alphabet, Vector2i monospaced_letter_size);

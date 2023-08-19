@@ -78,10 +78,10 @@ void GameUpdateAndRender(Game_Input *input, Game_Output *out)
         DrawSetPixel(out, v2(0, 0), v4_yellow);
         DrawSetPixel(out, v2(1, 1), v4_blue);
 
-        Image image = LoadImage(input, S("../data/guy.png"));
+        Image image = LoadImage(S("../data/guy.png"));
         DrawImage(out, image, v2(64, 64));
 
-        DrawImageExt(out, image, r2(v2(128, 128), v2(256, 256)), r2(v2(0, 0), v2(1, 1)));
+        DrawImageExt(out, image, r2(v2(128, 128), v2(256, 256)), v4_white, r2(v2(0, 0), v2(1, 1)));
 
         DrawCircle(out, v2(200, 32), 32, v4_blue);
     }
@@ -91,12 +91,12 @@ void GameUpdateAndRender(Game_Input *input, Game_Output *out)
     {
         DrawRect(out, r2(v2(0, 0), v2(out->width, out->height)), v4_black);
 
-        Image image = LoadImage(input, S("../data/guy.png"));
-        DrawImageExt(out, image, r2(v2(0, 0), v2(out->width, out->height)), r2(v2(0, 0), v2(2, 2)));
+        Image image = LoadImage(S("../data/guy.png"));
+        DrawImageExt(out, image, r2(v2(0, 0), v2(out->width, out->height)), v4_white, r2(v2(0, 0), v2(2, 2)));
     }
     num_slides += 1;
 
-    Sound sound = LoadSound(input, S("../data/snd_boot_sequence.wav"));
+    Sound sound = LoadSound(S("../data/snd_boot_sequence.wav"));
     #if 0
     static b32 did_reset = false;
     if (ctrl0->down)
@@ -113,6 +113,11 @@ void GameUpdateAndRender(Game_Input *input, Game_Output *out)
     }
     PlaySoundStream(out, sound, 1.0);
     #endif
+
+    Image image = LoadImage(S("../data/font_test.png"));
+    Font font = FontMake(image, S("ABCD"), v2i(16, 16));
+
+    DrawText(out, font, S("AAABBBCCCDDD"), v2(0, 0));
 
     if (slide_index < 0) slide_index += num_slides;
     if (slide_index >= num_slides) slide_index -= num_slides;

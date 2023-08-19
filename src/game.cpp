@@ -109,7 +109,7 @@ Asset_Info *GetAssetByIndex(void *array, u64 size, u64 count, i64 index)
     return result;
 }
 
-Image LoadImage(Game_Input *input, String path)
+Image LoadImage(String path)
 {
     u64 hash = murmur64(path.data, path.count);
 
@@ -158,7 +158,7 @@ Image LoadImage(Game_Input *input, String path)
     return {};
 }
 
-Sound LoadSound(Game_Input *input, String path)
+Sound LoadSound(String path)
 {
     u64 hash = murmur64(path.data, path.count);
 
@@ -214,6 +214,42 @@ Sound LoadSound(Game_Input *input, String path)
     }
 
     return {};
+}
+
+Font FontMake(Image image, String alphabet, Vector2i monospaced_letter_size)
+{
+    Font result = {0};
+
+    Vector2i cursor = {0, 0};
+
+    result.image = image;
+
+    Font_Glyph *null_glyph = &result.glyphs[0];
+    null_glyph->character = 0;
+    null_glyph->size = monospaced_letter_size;
+
+    result.glyph_count += 1;
+
+    for (i32 index = 0; index < Min(alphabet.count, count_of(result.glyphs)); index += 1)
+    {
+        u32 character = alphabet.data[index];
+
+        Font_Glyph *glyph = &result.glyphs[result.glyph_count];
+        result.glyph_count += 1;
+
+        glyph->character = character;
+        glyph->pos = cursor;
+        glyph->size = monospaced_letter_size;
+
+        cursor.x += monospaced_letter_size.x;
+        if (cursor.x >= image.size.width)
+        {
+            cursor.x = 0;
+            cursor.y += monospaced_letter_size.y;
+        }
+    }
+
+    return result;
 }
 
 //
@@ -449,6 +485,8 @@ void DrawImage(Game_Output *out, Image image, Vector2 pos)
     i32 in_y0 = Clamp((i32)rect.y0, 0, out->height);
     i32 in_y1 = Clamp((i32)rect.y1, 0, out->height);
 
+    if (in_x0 == in_x1 || in_y0 == in_y1) return;
+    if (image.size.width == 0 || image.size.height == 0) return;
 
     u32 *samples = image.pixels;
     u32 *at = &pixels[in_y0 * out->width + in_x0];
@@ -471,7 +509,7 @@ void DrawImage(Game_Output *out, Image image, Vector2 pos)
     }
 }
 
-void DrawImageExt(Game_Output *out, Image image, Rectangle2 rect, Rectangle2 uv)
+void DrawImageExt(Game_Output *out, Image image, Rectangle2 rect, Vector4 color, Rectangle2 uv)
 {
     u32 *pixels = (u32 *)out->pixels;
 
@@ -483,9 +521,13 @@ void DrawImageExt(Game_Output *out, Image image, Rectangle2 rect, Rectangle2 uv)
     i32 in_y0 = Clamp((i32)rect.y0, 0, out->height);
     i32 in_y1 = Clamp((i32)rect.y1, 0, out->height);
 
+    if (in_x0 == in_x1 || in_y0 == in_y1) return;
+    if (image.size.width == 0 || image.size.height == 0) return;
 
     u32 *samples = image.pixels;
     u32 *at = &pixels[in_y0 * out->width + in_x0];
+
+    b32 color_is_white = color.r == 1 && color.g == 1 && color.b == 1 && color.a == 1;
 
     for (i32 y = in_y0; y < in_y1; y += 1)
     {
@@ -504,7 +546,14 @@ void DrawImageExt(Game_Output *out, Image image, Rectangle2 rect, Rectangle2 uv)
 
             if ((sample_color & 0xff000000) != 0)
             {
-                *at = sample_color;
+                if (color_is_white)
+                {
+                    *at = sample_color;
+                }
+                else
+                {
+                    *at = rgba_u32_from_v4(rgba_v4_from_u32(sample_color) * color);
+                }
             }
 
             at += 1;
@@ -512,6 +561,51 @@ void DrawImageExt(Game_Output *out, Image image, Rectangle2 rect, Rectangle2 uv)
 
         at += out->width - (in_x1 - in_x0);
     }
+}
+
+Font_Glyph FontGetGlyph(Font font, u32 character)
+{
+    Font_Glyph result = font.glyphs[0];
+
+    for (i32 index = 1; index < font.glyph_count; index += 1)
+    {
+        Font_Glyph *it = &font.glyphs[index];
+        if (it->character == character)
+        {
+            result = *it;
+            break;
+        }
+    }
+
+    return result;
+}
+
+void DrawTextExt(Game_Output *out, Font font, String text, Vector2 pos, Vector4 color)
+{
+    Vector2 cursor = pos;
+
+    for (i32 i = 0; i < text.count; i += 1)
+    {
+        u32 character = (u32)text.data[i];
+        Font_Glyph glyph = FontGetGlyph(font, character);
+
+        Rectangle2 uv = r2(
+            (v2_from_v2i(glyph.pos)) / (v2_from_v2i(font.image.size)),
+            (v2_from_v2i(glyph.pos) + v2_from_v2i(glyph.size)) / (v2_from_v2i(font.image.size))
+        );
+
+        if (color.a > 0)
+        {
+            DrawImageExt(out, font.image, r2(cursor, cursor + v2_from_v2i(glyph.size)), color, uv);
+        }
+
+        cursor.x += glyph.size.width;
+    }
+}
+
+void DrawText(Game_Output *out, Font font, String text, Vector2 pos)
+{
+    DrawTextExt(out, font, text, pos, v4_white);
 }
 
 //

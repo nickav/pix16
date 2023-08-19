@@ -1242,6 +1242,14 @@ function Vector4 operator*(f32 a, Vector4 b) {
     return v4_mulf(b, a);
 }
 
+function Vector4 operator*(Vector4 a, Vector4 b) {
+    return v4_mul(a, b);
+}
+
+function Vector4 operator*=(Vector4 &a, Vector4 b) {
+    return a = a * b;
+}
+
 function Vector4 operator*(Vector4 a, f32 b) {
     return b * a;
 }
