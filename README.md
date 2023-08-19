@@ -52,14 +52,15 @@ You could even add a backend that targets [SDL2](https://www.libsdl.org/) to sup
 
 ## TODO
 
-- [ ] SDL2 backend
-- [ ] DrawLine
-- [ ] DrawText
+- add monospaced font to draw for DrawText
+- have some way to load non-monospaced fonts
+- transparency
+- see if we need to blend transparency in linear rgb
 
-- [ ] PlayTriangle
-- [ ] PlaySquare
-- [ ] PlayNoise
+- DrawLine
 
-- [ ] fix audio mixing (i16 overflows easily!)
-- [ ] provide async audio API
+- SDL2 backend
+
+- more robust audio mixing (we only support 8 concurrent sounds at the moment)
+- async audio API
 
