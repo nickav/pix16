@@ -25,9 +25,7 @@ struct Image
 {
     Vector2i size;
     u32 *pixels;
-    
-    String name;
-    u64 hash;
+    i64 index;
 };
 
 struct Sound
@@ -38,32 +36,31 @@ struct Sound
 
     u32 total_samples;
     i16 *samples;
-
-    u32 sample_offset; // samples played so far
-
-    String name;
-    u64 hash;
+    i64 index;
 };
 
 struct Game_Input
 {
+    // User Memory
     Arena *arena;
+
+    // Time
     f32 dt;
     f32 time;
 
+    // Inputs
     Mouse mouse;
     Controller controllers[4];
-
-    Image images[1024];
-    Sound sounds[1024];
 };
 
 struct Game_Output
 {
+    // Screen Pixels
     i32 width;
     i32 height;
     u32 *pixels;
 
+    // Audio
     i32 samples_per_second;
     i32 sample_count;
     i16 *samples;
@@ -118,16 +115,16 @@ void DrawText(Game_Output *out, Font *font, String text, Vector2 pos, Vector4 co
 void PlaySine(Game_Output *out, f32 tone_hz, f32 volume);
 void PlayTriangle(Game_Output *out, f32 tone_hz, f32 volume);
 void PlaySquare(Game_Output *out, f32 tone_hz, f32 volume);
-void PlayNoise(Game_Output *out, f32 tone_hz, f32 volume);
+void PlayNoise(Game_Output *out, f32 volume);
 
-void PlaySoundStream(Game_Output *out, Sound *sound);
+void PlaySoundStream(Game_Output *out, Sound sound, f32 volume);
+void SoundSeek(Game_Output *out, Sound sound, f32 time_in_seconds);
+f32 SoundGetTime(Game_Output *out, Sound sound);
 
 //
 // Assets API
 //
 
 Image LoadImage(Game_Input *input, String path);
-void FreeImage(Game_Input *input, String path);
-
-Sound *LoadSound(Game_Input *input, String path);
-void FreeSound(Game_Input *input, String path);
+Sound LoadSound(Game_Input *input, String path);
+Font  LoadFont(Game_Input *input, Image image, String alphabet);

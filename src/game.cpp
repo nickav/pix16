@@ -6,6 +6,220 @@
 #define DR_WAV_IMPLEMENTATION
 #include "third_party/dr_wav.h"
 
+struct Asset_Info
+{
+    String name;
+    i64 index;
+    u64 hash;
+};
+
+struct Image_Asset
+{
+    Asset_Info info;
+    Image image;
+};
+
+struct Sound_Asset
+{
+    Asset_Info info;
+    Sound sound;
+
+    u32 sample_offset;
+};
+
+struct Font_Asset
+{
+    Asset_Info info;
+    Font font;
+};
+
+struct Game_State
+{
+    Image_Asset images[1024];
+    Sound_Asset sounds[1024];
+    Font_Asset  fonts[1024];
+
+    Random_State rng;
+};
+
+static Game_State g_state = {0};
+
+void GameInit()
+{
+    g_state.rng = {0x6908243098231};
+}
+
+//
+// Assets API
+//
+
+Asset_Info *FindAssetByHash(void *array, u64 size, u64 count, u64 hash)
+{
+    Asset_Info *result = NULL;
+
+    if (hash == 0) hash += 1;
+
+    u8 *at = (u8 *)array;
+    for (i64 index = 0; index < count; index += 1)
+    {
+        Asset_Info *it = (Asset_Info *)at;
+
+        if (it->hash == hash)
+        {
+            result = it;
+            result->index = index;
+            break;
+        }
+
+        at += size;
+    }
+
+    return result;
+}
+
+Asset_Info *FindFreeAsset(void *array, u64 size, u64 count)
+{
+    Asset_Info *result = NULL;
+
+    u8 *at = (u8 *)array;
+    for (i64 index = 0; index < count; index += 1)
+    {
+        Asset_Info *it = (Asset_Info *)at;
+
+        if (it->hash == 0)
+        {
+            result = it;
+            result->index = index;
+            break;
+        }
+
+        at += size;
+    }
+
+    return result;
+}
+
+Asset_Info *GetAssetByIndex(void *array, u64 size, u64 count, i64 index)
+{
+    Asset_Info *result = NULL;
+    if (index >= 0 && index < count)
+    {
+        result = (Asset_Info *)((u8 *)(array) + size * index);
+    }
+    return result;
+}
+
+Image LoadImage(Game_Input *input, String path)
+{
+    u64 hash = murmur64(path.data, path.count);
+
+    Image_Asset *result = (Image_Asset *)FindAssetByHash(&g_state.images, sizeof(Image_Asset), count_of(g_state.images), hash);
+
+    if (!result)
+    {
+        result = (Image_Asset *)FindFreeAsset(&g_state.images, sizeof(Image_Asset), count_of(g_state.images));
+
+        if (!result)
+        {
+            print("[LoadImage] Used all %d slots available! Failed to load image: %.*s\n", count_of(g_state.images), LIT(path));
+        }
+    }
+
+    if (result)
+    {
+        if (result->info.hash == 0)
+        {
+            M_Temp scratch = GetScratch(0, 0);
+
+            String contents = os_read_entire_file(scratch.arena, path);
+
+            if (contents.count > 0)
+            {
+                int width, height, channels;
+                result->image.pixels      = (u32 *)stbi_load_from_memory(contents.data, contents.count, &width, &height, &channels, 4);
+                result->image.size.width  = width;
+                result->image.size.height = height;
+                result->image.index = result->info.index;
+            }
+            else
+            {
+                print("[LoadImage] Image not found: %.*s\n", LIT(path));
+            }
+
+            result->info.name = path;
+            result->info.hash = hash;
+
+            ReleaseScratch(scratch);
+        }
+
+        return result->image;
+    }
+
+    return {};
+}
+
+Sound LoadSound(Game_Input *input, String path)
+{
+    u64 hash = murmur64(path.data, path.count);
+
+    Sound_Asset *result = (Sound_Asset *)FindAssetByHash(&g_state.sounds, sizeof(Sound_Asset), count_of(g_state.sounds), hash);
+
+    if (!result)
+    {
+        result = (Sound_Asset *)FindFreeAsset(&g_state.sounds, sizeof(Sound_Asset), count_of(g_state.sounds));
+
+        if (!result)
+        {
+            print("[LoadSound] Used all %d slots available! Failed to load sound: %.*s\n", count_of(g_state.sounds), LIT(path));
+        }
+    }
+
+    if (result)
+    {
+        if (result->info.hash == 0)
+        {
+            M_Temp scratch = GetScratch(0, 0);
+
+            String contents = os_read_entire_file(scratch.arena, path);
+
+            if (contents.count > 0)
+            {
+                unsigned int channels;
+                unsigned int sample_rate;
+                drwav_uint64 total_pcm_frame_count;
+                i16 *samples = drwav_open_memory_and_read_pcm_frames_s16(contents.data, contents.count, &channels, &sample_rate, &total_pcm_frame_count, NULL);
+
+                result->sound.bits_per_sample = 32;
+                result->sound.num_channels = channels;
+                result->sound.sample_rate = sample_rate;
+                result->sound.total_samples = total_pcm_frame_count;
+                result->sound.samples = samples;
+                result->sound.index = result->info.index;
+
+                assert(channels == 2);
+                assert(sample_rate == 44100);
+            }
+            else
+            {
+                print("[LoadSound] Sound not found: %.*s\n", LIT(path));
+            }
+
+            result->info.name = path;
+            result->info.hash = hash;
+
+            ReleaseScratch(scratch);
+        }
+
+        return result->sound;
+    }
+
+    return {};
+}
+
+//
+// Drawing API
+//
+
 void DrawSetPixel(Game_Output *out, Vector2 pos, Vector4 color)
 {
     i32 in_x = Clamp((i32)pos.x, 0, out->width);
@@ -222,113 +436,6 @@ void DrawTriangleExt(Game_Output *out, Vector2 p0, Vector4 c0, Vector2 p1, Vecto
     }
 }
 
-void PlaySine(Game_Output *out, f32 tone_hz, f32 volume)
-{
-    int wave_period = out->samples_per_second / tone_hz;
-    f32 t_sine = out->samples_played * TAU / (f32)wave_period;
-    t_sine = Mod(t_sine, TAU);
-
-    i16 *sample_out = out->samples;
-    for (int sample_index = 0; sample_index < out->sample_count; sample_index++)
-    {
-        f32 sine_value   = sin_f32(t_sine);
-        i16 sample_value = (i16)(sine_value * volume);
-        *sample_out++ += sample_value;
-        *sample_out++ += sample_value;
-
-        t_sine += TAU / (f32)wave_period;
-        if (t_sine >= TAU) {
-            t_sine -= TAU;
-        }
-    }
-}
-
-Image LoadImage(Game_Input *input, String path)
-{
-    u64 hash = murmur64(path.data, path.count);
-
-    Image *result = NULL;
-    for (i64 index = 0; index < count_of(input->images); index += 1)
-    {
-        Image *it = &input->images[index];
-        if (it->hash == hash)
-        {
-            result = it;
-            break;
-        }
-    }
-
-    if (!result)
-    {
-        for (i64 index = 0; index < count_of(input->images); index += 1)
-        {
-            Image *it = &input->images[index];
-            if (it->hash == 0)
-            {
-                result = it;
-                break;
-            }
-        }
-
-        if (!result)
-        {
-            print("[LoadImage] Used all %d slots available! Failed to load image: %.*s\n", count_of(input->images), LIT(path));
-        }
-    }
-
-    if (result)
-    {
-        if (result->hash == 0)
-        {
-            M_Temp scratch = GetScratch(0, 0);
-
-            String contents = os_read_entire_file(scratch.arena, path);
-
-            if (contents.count > 0)
-            {
-                int width, height, channels;
-                result->pixels      = (u32 *)stbi_load_from_memory(contents.data, contents.count, &width, &height, &channels, 4);
-                result->size.width  = width;
-                result->size.height = height;
-            }
-            else
-            {
-                print("[LoadImage] Image not found: %.*s\n", LIT(path));
-            }
-
-            result->name = path;
-            result->hash = hash;
-
-            ReleaseScratch(scratch);
-        }
-
-        return *result;
-    }
-
-    return {};
-}
-
-void FreeImage(Game_Input *input, String path)
-{
-    u64 hash = murmur64(path.data, path.count);
-
-    Image *result = NULL;
-    for (i64 index = 0; index < count_of(input->images); index += 1)
-    {
-        Image *it = &input->images[index];
-        if (it->hash == hash)
-        {
-            free(it->pixels); 
-            it->pixels = 0;
-
-            it->hash = 0;
-            MemoryZeroStruct(it);
-
-            break;
-        }
-    }
-}
-
 void DrawImage(Game_Output *out, Image image, Vector2 pos)
 {
     u32 *pixels = (u32 *)out->pixels;
@@ -407,117 +514,96 @@ void DrawImageExt(Game_Output *out, Image image, Rectangle2 rect, Rectangle2 uv)
     }
 }
 
-Sound *LoadSound(Game_Input *input, String path)
+//
+// Sound API
+//
+
+#define MAX_CONCURRENT_SOUNDS ((f32)8)
+#define MAX_SOUND_SIZE (I16_MAX * (1.0 / MAX_CONCURRENT_SOUNDS))
+
+void PlaySine(Game_Output *out, f32 tone_hz, f32 volume)
 {
-    u64 hash = murmur64(path.data, path.count);
+    volume = clamp_f32(volume, 0, 1);
 
-    Sound *result = NULL;
-    for (i64 index = 0; index < count_of(input->sounds); index += 1)
+    int wave_period = out->samples_per_second / tone_hz;
+    f32 t_sine = out->samples_played * TAU / (f32)wave_period;
+    t_sine = Mod(t_sine, TAU);
+
+    i16 *sample_out = out->samples;
+    for (int sample_index = 0; sample_index < out->sample_count; sample_index++)
     {
-        Sound *it = &input->sounds[index];
-        if (it->hash == hash)
-        {
-            result = it;
-            break;
-        }
-    }
+        f32 sine_value   = sin_f32(t_sine);
+        i16 sample_value = (i16)(sine_value * volume * MAX_SOUND_SIZE);
+        *sample_out++ += sample_value;
+        *sample_out++ += sample_value;
 
-    if (!result)
-    {
-        for (i64 index = 0; index < count_of(input->sounds); index += 1)
-        {
-            Sound *it = &input->sounds[index];
-            if (it->hash == 0)
-            {
-                result = it;
-                break;
-            }
-        }
-
-        if (!result)
-        {
-            print("[LoadSound] Used all %d slots available! Failed to load sound: %.*s\n", count_of(input->sounds), LIT(path));
-        }
-    }
-
-    if (result)
-    {
-        if (result->hash == 0)
-        {
-            M_Temp scratch = GetScratch(0, 0);
-
-            String contents = os_read_entire_file(scratch.arena, path);
-
-            if (contents.count > 0)
-            {
-                unsigned int channels;
-                unsigned int sample_rate;
-                drwav_uint64 total_pcm_frame_count;
-                i16 *samples = drwav_open_memory_and_read_pcm_frames_s16(contents.data, contents.count, &channels, &sample_rate, &total_pcm_frame_count, NULL);
-
-                result->bits_per_sample = 32;
-                result->num_channels = channels;
-                result->sample_rate = sample_rate;
-                result->total_samples = total_pcm_frame_count;
-                result->samples = samples;
-                result->sample_offset = 0;
-
-                assert(channels == 2);
-                assert(sample_rate == 44100);
-            }
-            else
-            {
-                print("[LoadSound] Sound not found: %.*s\n", LIT(path));
-            }
-
-            result->name = path;
-            result->hash = hash;
-
-            ReleaseScratch(scratch);
-        }
-    }
-
-    return result;
-}
-
-void FreeSound(Game_Input *input, String path)
-{
-    u64 hash = murmur64(path.data, path.count);
-
-    Sound *result = NULL;
-    for (i64 index = 0; index < count_of(input->sounds); index += 1)
-    {
-        Sound *it = &input->sounds[index];
-        if (it->hash == hash)
-        {
-            free(it->samples); 
-            it->samples = 0;
-
-            it->hash = 0;
-            MemoryZeroStruct(it);
-
-            break;
+        t_sine += TAU / (f32)wave_period;
+        if (t_sine >= TAU) {
+            t_sine -= TAU;
         }
     }
 }
 
-void PlaySoundStream(Game_Output *out, Sound *sound)
+void PlayNoise(Game_Output *out, f32 volume)
 {
+    volume = clamp_f32(volume, 0, 1);
+
+    Random_State *rng = &g_state.rng;
+
+    i16 *sample_out = out->samples;
+    for (int sample_index = 0; sample_index < out->sample_count; sample_index++)
+    {
+        f32 random_value   = random_f32_between(rng, -1.0, 1.0);
+        i16 sample_value = (i16)(random_value * volume * MAX_SOUND_SIZE);
+        *sample_out++ += sample_value;
+        *sample_out++ += sample_value;
+    }
+}
+
+void PlaySoundStream(Game_Output *out, Sound sound, f32 volume)
+{
+    Sound_Asset *asset = (Sound_Asset *)GetAssetByIndex(&g_state.sounds, sizeof(Sound_Asset), count_of(g_state.sounds), sound.index); 
+    if (!asset) return;
+
+    volume = clamp_f32(volume, 0, 1);
+
     i16 *samples = out->samples;
-    i16 *at = (i16 *)((u8 *)sound->samples + sound->sample_offset * sizeof(i16) * 2);
 
-    u32 samples_remaining = sound->total_samples - sound->sample_offset;
+    i16 *at = (i16 *)((u8 *)sound.samples + asset->sample_offset * sizeof(i16) * 2);
+
+    u32 samples_remaining = sound.total_samples - asset->sample_offset;
 
     u32 sample_count = Min(out->sample_count, samples_remaining);
 
     for (int sample_index = 0; sample_index < sample_count; sample_index++)
     {
-        *samples++ += *at;
+        *samples++ += *at * (volume / MAX_CONCURRENT_SOUNDS);
         at += 1;
 
-        *samples++ += *at;
+        *samples++ += *at * (volume / MAX_CONCURRENT_SOUNDS);
         at += 1;
     }
 
-    sound->sample_offset += sample_count;
+    asset->sample_offset += sample_count;
+}
+
+f32 SoundGetTime(Game_Output *out, Sound sound)
+{
+    Sound_Asset *asset = (Sound_Asset *)GetAssetByIndex(&g_state.sounds, sizeof(Sound_Asset), count_of(g_state.sounds), sound.index); 
+    if (!asset) return 0;
+
+    assert(out->samples_per_second > 0);
+
+    u32 sample_offset = clamp_u32(asset->sample_offset, 0, sound.total_samples);
+    f32 result = sample_offset / (f32)out->samples_per_second;
+    return result;
+}
+
+void SoundSeek(Game_Output *out, Sound sound, f32 time_in_seconds)
+{
+    Sound_Asset *asset = (Sound_Asset *)GetAssetByIndex(&g_state.sounds, sizeof(Sound_Asset), count_of(g_state.sounds), sound.index); 
+    if (!asset) return;
+
+    u32 sample_offset = out->samples_per_second * Max(time_in_seconds, 0);
+    asset->sample_offset = clamp_u32(sample_offset, 0, sound.total_samples);
 }

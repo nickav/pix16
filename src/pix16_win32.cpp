@@ -513,6 +513,8 @@ int APIENTRY WinMain(HINSTANCE instance, HINSTANCE prev_inst, LPSTR argv, int ar
 
     ShowWindow(hwnd, SW_SHOW);
 
+    GameInit();
+
     f64 then = os_time();
     f64 accumulator = 0.0;
     f64 average_dt = 0.0;

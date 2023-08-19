@@ -49,3 +49,17 @@ This will create a release build in the `build` directory and a distributable `p
 The project has only been set up for Windows so far. Other operating systems can be added by creating an entry point file and build scripts for other platforms.
 
 You could even add a backend that targets [SDL2](https://www.libsdl.org/) to support all the operating systems that it supports!
+
+## TODO
+
+- [ ] SDL2 backend
+- [ ] DrawLine
+- [ ] DrawText
+
+- [ ] PlayTriangle
+- [ ] PlaySquare
+- [ ] PlayNoise
+
+- [ ] fix audio mixing (i16 overflows easily!)
+- [ ] provide async audio API
+

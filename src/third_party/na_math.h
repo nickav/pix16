@@ -2220,16 +2220,15 @@ function b32 line_intersects_circle(Vector2 p1, Vector2 p2, Vector2 circle, f32 
     return h2 <= radius * radius;
 }
 
-f32 triangle_sign(Vector2 p1, Vector2 p2, Vector2 p3)
-{
-    return (p1.x - p3.x) * (p2.y - p3.y) - (p2.x - p3.x) * (p1.y - p3.y);
-}
-
 function b32 point_in_triangle(Vector2 point, Vector2 v1, Vector2 v2, Vector2 v3)
 {
+    #define triangle_sign(p1, p2, p3) (p1.x - p3.x) * (p2.y - p3.y) - (p2.x - p3.x) * (p1.y - p3.y)
+
     f32 d1 = triangle_sign(point, v1, v2);
     f32 d2 = triangle_sign(point, v2, v3);
     f32 d3 = triangle_sign(point, v3, v1);
+
+    #undef triangle_sign
 
     b32 has_neg = (d1 < 0) || (d2 < 0) || (d3 < 0);
     b32 has_pos = (d1 > 0) || (d2 > 0) || (d3 > 0);

@@ -96,13 +96,13 @@ void GameUpdateAndRender(Game_Input *input, Game_Output *out)
     }
     num_slides += 1;
 
-    Sound *sound = LoadSound(input, S("../data/snd_boot_sequence.wav"));
+    Sound sound = LoadSound(input, S("../data/snd_boot_sequence.wav"));
     static b32 did_reset = false;
     if (ctrl0->down)
     {
         if (!did_reset)
         {
-            sound->sample_offset = 0;
+            SoundSeek(out, sound, 0);
             did_reset = true;
         }
     }
@@ -111,19 +111,24 @@ void GameUpdateAndRender(Game_Input *input, Game_Output *out)
         did_reset = false;
     }
 
-    PlaySoundStream(out, sound);
+    PlaySoundStream(out, sound, 1.0);
 
     if (slide_index < 0) slide_index += num_slides;
     if (slide_index >= num_slides) slide_index -= num_slides;
 
     if (ctrl0->right)
     {
-        PlaySine(out, 440.0f, 3000);
+        PlaySine(out, 440.0f, 1.0);
     }
 
     if (ctrl0->left)
     {
-        PlaySine(out, 523.25f, 3000);
-        PlaySine(out, 783.99f, 3000);
+        PlaySine(out, 523.25f, 1.0);
+        PlaySine(out, 783.99f, 1.0);
+    }
+
+    if (ctrl0->up)
+    {
+        PlayNoise(out, 0.5);
     }
 }
