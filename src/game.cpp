@@ -226,8 +226,7 @@ Font FontMake(Image image, String alphabet, Vector2i monospaced_letter_size)
 
     Font_Glyph *null_glyph = &result.glyphs[0];
     null_glyph->character = 0;
-    null_glyph->size = monospaced_letter_size;
-
+    null_glyph->size = v2i(monospaced_letter_size.x, 0);
     result.glyph_count += 1;
 
     for (i32 index = 0; index < Min(alphabet.count, count_of(result.glyphs)); index += 1)

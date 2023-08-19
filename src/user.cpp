@@ -117,7 +117,7 @@ void GameUpdateAndRender(Game_Input *input, Game_Output *out)
     Image image = LoadImage(S("../data/font_test.png"));
     Font font = FontMake(image, S("ABCD"), v2i(16, 16));
 
-    DrawText(out, font, S("AAABBBCCCDDD"), v2(0, 0));
+    DrawText(out, font, S("AAA BBB CCC DDD"), v2(0, 0));
 
     if (slide_index < 0) slide_index += num_slides;
     if (slide_index >= num_slides) slide_index -= num_slides;

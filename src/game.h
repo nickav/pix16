@@ -129,6 +129,6 @@ f32 SoundGetTime(Game_Output *out, Sound sound);
 // Assets API
 //
 
-Image LoadImageFromPath(String path);
-Sound LoadSoundFromPath(String path);
+Image LoadImage(String path);
+Sound LoadSound(String path);
 Font FontMake(Image image, String alphabet, Vector2i monospaced_letter_size);
