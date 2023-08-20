@@ -37,10 +37,11 @@ static void win32__print(const char *format, ...) {
 #include "profiler.cpp"
 
 #include "game.h"
-#include "game.cpp"
+#include "user.cpp"
+
 #include "pix16_win32_audio.cpp"
 
-#include "user.cpp"
+#include "game.cpp"
 
 //
 // NOTE(nick): win32 entry code
@@ -476,6 +477,8 @@ int APIENTRY WinMain(HINSTANCE instance, HINSTANCE prev_inst, LPSTR argv, int ar
         0, 0, instance, 0
     );
 
+    ReleaseScratch(scratch);
+
     HDC hdc = GetDC(hwnd);
 
     int window_width = size.x;
@@ -518,6 +521,10 @@ int APIENTRY WinMain(HINSTANCE instance, HINSTANCE prev_inst, LPSTR argv, int ar
     ShowWindow(hwnd, SW_SHOW);
 
     GameInit();
+    
+    win32_resize_framebuffer(&win32_framebuffer, game_width, game_height);
+
+    Arena *permanant_storage = arena_alloc(Megabytes(4));
 
     f64 then = os_time();
     f64 accumulator = 0.0;
@@ -534,6 +541,9 @@ int APIENTRY WinMain(HINSTANCE instance, HINSTANCE prev_inst, LPSTR argv, int ar
         f64 now = os_time();
         f64 dt = now - then;
         then = now;
+
+        // NOTE(nick): reset temporary storage
+        arena_reset(temp_arena());
 
         // NOTE(nick): Debug frame timings
         {
@@ -569,17 +579,8 @@ int APIENTRY WinMain(HINSTANCE instance, HINSTANCE prev_inst, LPSTR argv, int ar
             DispatchMessageW(&msg);
         }
 
-        // NOTE(nick): reset temporary storage
-        arena_reset(temp_arena());
-
         static Game_Input input = {};
         {
-            static Arena *permanant_storage = NULL;
-            if (!permanant_storage)
-            {
-                permanant_storage = arena_alloc(Megabytes(4));
-            }
-
             input.arena = permanant_storage;
             input.dt = target_dt;
             input.time = os_time();
@@ -641,7 +642,7 @@ int APIENTRY WinMain(HINSTANCE instance, HINSTANCE prev_inst, LPSTR argv, int ar
             }
         }
 
-        static Game_Output output = {};
+        static Game_Output output = {0};
         output.pixels = win32_framebuffer.pixels;
         output.width  = win32_framebuffer.width;
         output.height = win32_framebuffer.height;
@@ -670,10 +671,15 @@ int APIENTRY WinMain(HINSTANCE instance, HINSTANCE prev_inst, LPSTR argv, int ar
         output.sample_count = UserSampleCount;
         output.samples = UserSamples;
 
-        profiler__begin();
-        GameUpdateAndRender(&input, &output);
-        profiler__end();
-        profiler__print();
+        //profiler__begin();
+        DrawRect(&output, r2(v2(0, 0), v2(output.width, output.height)), v4_blue);
+        Image image = LoadImage(S("../data/font_test.png"));
+        DrawImage(&output, image, v2(0, 0));
+        //Font font = FontMake(image, S("ABCD"), v2i(16, 16));
+        //DrawText(&output, font, S("AAA BBB CCC DDD"), v2(0, 0));
+        //GameUpdateAndRender(&input, &output);
+        //profiler__end();
+        //profiler__print();
 
         //static i32 frames = 0;
         //if (frames ++ >= 10) os_exit(0);
