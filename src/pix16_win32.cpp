@@ -73,8 +73,10 @@ global b32 win32_window_is_fullscreen = false;
 global Win32_Framebuffer win32_framebuffer = {0};
 
 static b32 should_quit = false;
+
 static i32 game_width = 320;
 static i32 game_height = 240;
+static b32 game_pixel_perfect = true;
 
 function void
 win32_toggle_fullscreen(HWND hwnd)
@@ -204,6 +206,10 @@ win32_window_callback(HWND hwnd, UINT message, WPARAM w_param, LPARAM l_param)
                 Win32_Framebuffer *framebuffer = &win32_framebuffer;
 
                 Rectangle2i dest_rect = aspect_ratio_fit(game_width, game_height, window_width, window_height);
+                if (game_pixel_perfect)
+                {
+                    dest_rect = aspect_ratio_fit_pixel_perfect(game_width, game_height, window_width, window_height);
+                }
 
                 HDC hdc = GetDC(hwnd);
 
@@ -231,6 +237,22 @@ win32_window_callback(HWND hwnd, UINT message, WPARAM w_param, LPARAM l_param)
                             suggested->right - suggested->left,
                             suggested->bottom - suggested->top,
                             SWP_NOACTIVATE | SWP_NOZORDER);
+        } break;
+
+        case WM_GETMINMAXINFO:
+        {
+            // NOTE(nick): set window minimum size
+            DWORD style = WS_OVERLAPPEDWINDOW;
+            RECT wr = {0, 0, (LONG)game_width, (LONG)game_height};
+            AdjustWindowRect(&wr, style, FALSE);
+            int width = (int)(wr.right - wr.left);
+            int height = (int)(wr.bottom - wr.top);
+
+            MINMAXINFO *info = (MINMAXINFO *)l_param;
+            info->ptMinTrackSize.x = width;
+            info->ptMinTrackSize.y = height;
+
+            return 0;
         } break;
 
         case WM_SYSCOMMAND:
@@ -489,6 +511,9 @@ int APIENTRY WinMain(HINSTANCE instance, HINSTANCE prev_inst, LPSTR argv, int ar
         f32 scale = (f32)GetDeviceCaps(hdc, LOGPIXELSX) / (f32)USER_DEFAULT_SCREEN_DPI;
         if (scale > 1)
         {
+            // NOTE(nick): round up to the neareest 0.5
+            scale = round_f32(scale * 2) / 2;
+
             RECT wr = {0, 0, (LONG)(size.x * scale), (LONG)(size.y * scale)};
             AdjustWindowRect(&wr, WS_OVERLAPPEDWINDOW, FALSE);
             window_width = (i32)(wr.right - wr.left);
@@ -600,6 +625,10 @@ int APIENTRY WinMain(HINSTANCE instance, HINSTANCE prev_inst, LPSTR argv, int ar
                     int window_height = (int)(wr.bottom - wr.top);
 
                     Rectangle2i dest_rect = aspect_ratio_fit(game_width, game_height, window_width, window_height);
+                    if (game_pixel_perfect)
+                    {
+                        dest_rect = aspect_ratio_fit_pixel_perfect(game_width, game_height, window_width, window_height);
+                    }
 
                     input.mouse.position = v2(
                         game_width * ((point.x - dest_rect.x0) / (f32)r2i_width(dest_rect)),
@@ -672,12 +701,16 @@ int APIENTRY WinMain(HINSTANCE instance, HINSTANCE prev_inst, LPSTR argv, int ar
         output.samples = UserSamples;
 
         //profiler__begin();
+
+        #if 0
         DrawRect(&output, r2(v2(0, 0), v2(output.width, output.height)), v4_blue);
-        Image image = LoadImage(S("../data/font_test.png"));
-        DrawImage(&output, image, v2(0, 0));
-        //Font font = FontMake(image, S("ABCD"), v2i(16, 16));
-        //DrawText(&output, font, S("AAA BBB CCC DDD"), v2(0, 0));
-        //GameUpdateAndRender(&input, &output);
+        Image image = LoadImage(S("../data/guy.png"));
+        Vector2 pos = v2(output.width * 0.5 - image.size.width * 0.5, output.height * 0.5 - image.size.height * 0.5) + v2(0, sin_f32(os_time()) * 100);
+        DrawImage(&output, image, pos);
+        #endif
+
+        GameUpdateAndRender(&input, &output);
+        
         //profiler__end();
         //profiler__print();
 
@@ -714,6 +747,10 @@ int APIENTRY WinMain(HINSTANCE instance, HINSTANCE prev_inst, LPSTR argv, int ar
             Win32_Framebuffer *framebuffer = &win32_framebuffer;
 
             Rectangle2i dest_rect = aspect_ratio_fit(game_width, game_height, window_width, window_height);
+            if (game_pixel_perfect)
+            {
+                dest_rect = aspect_ratio_fit_pixel_perfect(game_width, game_height, window_width, window_height);
+            }
 
             StretchDIBits(hdc,
                 dest_rect.x0, dest_rect.y0, r2i_width(dest_rect), r2i_height(dest_rect),

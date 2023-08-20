@@ -785,6 +785,10 @@ function Vector2i operator*(Vector2i a, f32 b) {
     return v2i_mulf(a, b);
 }
 
+function Vector2i operator*(Vector2i a, i32 b) {
+    return v2i_muli(a, b);
+}
+
 function Vector2i &operator*=(Vector2i &a, f32 b) {
     return a = a * b;
 }
@@ -1436,6 +1440,30 @@ function Rectangle2i aspect_ratio_fit(u32 src_width, u32 src_height, u32 dest_wi
             result.x0 = half_empty;
             result.x1 = result.x0 + use_width;
         }
+    }
+
+    return result;
+}
+
+function Rectangle2i aspect_ratio_fit_pixel_perfect(u32 src_width, u32 src_height, u32 dest_width, u32 dest_height)
+{
+    Rectangle2i result = {};
+
+    // can't divide by zero!
+    if (src_width != 0 && src_height != 0 && dest_width != 0 && dest_height != 0)
+    {
+        u32 max_scalex = dest_width / src_width;
+        u32 max_scaley = dest_height / src_height;
+
+        u32 max_scale = Min(max_scalex, max_scaley);
+
+        Vector2i scaled_size = v2i(max_scale * src_width, max_scale * src_height);
+        i32 centerx = 0.5f * (dest_width - scaled_size.x);
+        i32 centery = 0.5f * (dest_height - scaled_size.y);
+        result.x0 = centerx;
+        result.y0 = centery;
+        result.x1 = result.x0 + scaled_size.x;
+        result.y1 = result.y0 + scaled_size.y;
     }
 
     return result;
