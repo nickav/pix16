@@ -73,8 +73,10 @@ struct Font_Glyph
     Vector2i pos;
     Vector2i size;
 
+    #if 0
     Vector2i line_offset;
     i32 xadvance;
+    #endif
 };
 
 struct Font
@@ -109,7 +111,7 @@ void DrawTriangleExt(Game_Output *out, Vector2 p0, Vector4 c0, Vector2 p1, Vecto
 void DrawLine(Game_Output *out, Vector2 p0, Vector2 p1, Vector4 color);
 
 void DrawImage(Game_Output *out, Image image, Vector2 pos);
-void DrawImageExt(Game_Output *out, Image image, Rectangle2 rect, Vector4 color, Rectangle2 uv);
+void DrawImageExt(Game_Output *out, Image image, Rectangle2 rect, Rectangle2 uv);
 
 void DrawText(Game_Output *out, Font font, String text, Vector2 pos);
 void DrawTextExt(Game_Output *out, Font font, String text, Vector2 pos, Vector4 color);

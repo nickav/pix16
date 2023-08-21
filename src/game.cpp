@@ -46,6 +46,7 @@ static Game_State g_state = {0};
 
 void GameInit()
 {
+    MemoryZero(&g_state, sizeof(Game_State));
     g_state.rng = {0x6908243098231};
 }
 
@@ -239,8 +240,6 @@ Font FontMake(Image image, String alphabet, Vector2i monospaced_letter_size)
         glyph->character = character;
         glyph->pos = cursor;
         glyph->size = monospaced_letter_size;
-        glyph->line_offset = v2i(0, 0);
-        glyph->xadvance = monospaced_letter_size.x;
 
         cursor.x += monospaced_letter_size.x;
         if (cursor.x >= image.size.width)
@@ -589,23 +588,23 @@ void DrawTextExt(Game_Output *out, Font font, String text, Vector2 pos, Vector4 
 
     for (i32 i = 0; i < text.count; i += 1)
     {
-        // @Incomplete: support unicode characters
         u32 character = (u32)text.data[i];
         Font_Glyph glyph = FontGetGlyph(font, character);
 
+        Rectangle2 uv = r2(
+            (v2_from_v2i(glyph.pos)) / (v2_from_v2i(font.image.size)),
+            (v2_from_v2i(glyph.pos) + v2_from_v2i(glyph.size)) / (v2_from_v2i(font.image.size))
+        );
+
         if (color.a > 0)
         {
-            Rectangle2 uv = r2(
-                (v2_from_v2i(glyph.pos)) / (v2_from_v2i(font.image.size)),
-                (v2_from_v2i(glyph.pos) + v2_from_v2i(glyph.size)) / (v2_from_v2i(font.image.size))
-            );
-
-            Vector2 pos = cursor + v2_from_v2i(glyph.line_offset);
-            Vector2 size = v2_from_v2i(glyph.size);
-            DrawImageExt(out, font.image, r2(pos, pos + size), color, uv);
+            Vector2 pos = cursor;
+            //pos += glyph.line_offset;
+            DrawImageExt(out, font.image, r2(pos, pos + v2_from_v2i(glyph.size)), color, uv);
         }
 
-        cursor.x += glyph.xadvance;
+        cursor.x += glyph.size.width;
+        //cursor.x += glyph.xadvance;
     }
 }
 
@@ -735,7 +734,7 @@ void PlaySoundStream(Game_Output *out, Sound sound, f32 volume)
     Sound_Asset *asset = (Sound_Asset *)GetAssetByIndex(&g_state.sounds, sizeof(Sound_Asset), count_of(g_state.sounds), sound.index); 
     if (!asset) return;
 
-    volume = clamp_f32(volume, 0, 2) / MAX_CONCURRENT_SOUNDS;
+    volume = clamp_f32(volume, 0, 2);
 
     i16 *samples = out->samples;
 
@@ -747,10 +746,10 @@ void PlaySoundStream(Game_Output *out, Sound sound, f32 volume)
 
     for (int sample_index = 0; sample_index < sample_count; sample_index++)
     {
-        *samples++ += *at * volume;
+        *samples++ += *at * (volume / MAX_CONCURRENT_SOUNDS);
         at += 1;
 
-        *samples++ += *at * volume;
+        *samples++ += *at * (volume / MAX_CONCURRENT_SOUNDS);
         at += 1;
     }
 

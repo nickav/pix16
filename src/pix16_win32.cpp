@@ -37,11 +37,10 @@ static void win32__print(const char *format, ...) {
 #include "profiler.cpp"
 
 #include "game.h"
-#include "user.cpp"
-
+#include "game.cpp"
 #include "pix16_win32_audio.cpp"
 
-#include "game.cpp"
+#include "user.cpp"
 
 //
 // NOTE(nick): win32 entry code
@@ -499,8 +498,6 @@ int APIENTRY WinMain(HINSTANCE instance, HINSTANCE prev_inst, LPSTR argv, int ar
         0, 0, instance, 0
     );
 
-    ReleaseScratch(scratch);
-
     HDC hdc = GetDC(hwnd);
 
     int window_width = size.x;
@@ -545,11 +542,11 @@ int APIENTRY WinMain(HINSTANCE instance, HINSTANCE prev_inst, LPSTR argv, int ar
 
     ShowWindow(hwnd, SW_SHOW);
 
-    GameInit();
-    
-    win32_resize_framebuffer(&win32_framebuffer, game_width, game_height);
+    Arena *permanant_storage = arena_alloc(Megabytes(8));
 
-    Arena *permanant_storage = arena_alloc(Megabytes(4));
+    GameInit();
+
+    win32_resize_framebuffer(&win32_framebuffer, game_width, game_height);
 
     f64 then = os_time();
     f64 accumulator = 0.0;
@@ -566,9 +563,6 @@ int APIENTRY WinMain(HINSTANCE instance, HINSTANCE prev_inst, LPSTR argv, int ar
         f64 now = os_time();
         f64 dt = now - then;
         then = now;
-
-        // NOTE(nick): reset temporary storage
-        arena_reset(temp_arena());
 
         // NOTE(nick): Debug frame timings
         {
@@ -603,6 +597,9 @@ int APIENTRY WinMain(HINSTANCE instance, HINSTANCE prev_inst, LPSTR argv, int ar
             TranslateMessage(&msg);
             DispatchMessageW(&msg);
         }
+
+        // NOTE(nick): reset temporary storage
+        arena_reset(temp_arena());
 
         static Game_Input input = {};
         {
@@ -671,7 +668,7 @@ int APIENTRY WinMain(HINSTANCE instance, HINSTANCE prev_inst, LPSTR argv, int ar
             }
         }
 
-        static Game_Output output = {0};
+        static Game_Output output = {};
         output.pixels = win32_framebuffer.pixels;
         output.width  = win32_framebuffer.width;
         output.height = win32_framebuffer.height;
@@ -700,22 +697,11 @@ int APIENTRY WinMain(HINSTANCE instance, HINSTANCE prev_inst, LPSTR argv, int ar
         output.sample_count = UserSampleCount;
         output.samples = UserSamples;
 
-        //profiler__begin();
-
-        #if 0
-        DrawRect(&output, r2(v2(0, 0), v2(output.width, output.height)), v4_blue);
-        Image image = LoadImage(S("../data/guy.png"));
-        Vector2 pos = v2(output.width * 0.5 - image.size.width * 0.5, output.height * 0.5 - image.size.height * 0.5) + v2(0, sin_f32(os_time()) * 100);
-        DrawImage(&output, image, pos);
-        #endif
+        profiler__begin();
 
         GameUpdateAndRender(&input, &output);
-        
-        //profiler__end();
-        //profiler__print();
 
-        //static i32 frames = 0;
-        //if (frames ++ >= 10) os_exit(0);
+        profiler__end();
 
         output.samples_played += UserSampleCount;
 
