@@ -73,17 +73,15 @@ struct Font_Glyph
     Vector2i pos;
     Vector2i size;
 
-    #if 0
     Vector2i line_offset;
     i32 xadvance;
-    #endif
 };
 
 struct Font
 {
     Image image;
 
-    Font_Glyph glyphs[256];
+    Font_Glyph glyphs[128];
     u32 glyph_count;
 };
 
