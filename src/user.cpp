@@ -4,6 +4,18 @@ void GameUpdateAndRender(Game_Input *input, Game_Output *out)
 
     static b32 did_advance_slides = false;
 
+    #if 0
+    DrawRect(out, r2(v2(0, 0), v2(out->width, out->height)), v4_black);
+
+    DrawTriangleExt(out,
+        v2(out->width * 0.5, 0), v4_red,
+        v2(0, out->height), v4_green,
+        v2(out->width, out->height), v4_blue);
+
+    return;
+    #endif
+
+
     Controller *ctrl0 = &input->controllers[0];
     if (ctrl0->b)
     {

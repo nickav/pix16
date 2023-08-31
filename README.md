@@ -2,6 +2,8 @@
 
 A fantasy console written in C from scratch.
 
+<img src="./assets/demo.png" style="image-rendering:pixelated;" width="648" />
+
 ## Getting Started
 
 ### Windows
