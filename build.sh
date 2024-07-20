@@ -14,8 +14,8 @@ pushd $project_root
 
     pushd build
         flags="-std=c++11 -Wno-deprecated-declarations -Wno-int-to-void-pointer-cast -Wno-writable-strings -Wno-dangling-else -Wno-switch -Wno-undefined-internal -Wno-logical-op-parentheses"
-        libs="-framework Cocoa -framework OpenGL"
-        time g++ -DDEBUG=1 -DBUILD_HASH=$build_hash -I ../src $flags $libs ../src/pix16_win32.cpp -o $exe_name
+        libs="$(pkg-config --libs sdl2)"
+        ~/bin/ntime clang++ -DDEBUG=1 -DBUILD_HASH=$build_hash -I ../src -I ../src/third_party $flags $libs ../src/pix16_sdl2.cpp -o $exe_name
 
         ./$exe_name
     popd

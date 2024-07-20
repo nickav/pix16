@@ -4171,7 +4171,23 @@ function String os_get_system_path(Arena *arena, SystemPath path)
 // Timing
 //
 
-function f64 os_time() {
+function f64 os_time()
+{
+    #if __MAC_OS_X_VERSION_MIN_REQUIRED >= 101200
+
+        #ifndef CLOCK_MONOTONIC_RAW
+            #error "CLOCK_MONOTONIC_RAW not found. Please verify that <time.h> is included from the MacOSX SDK rather than /usr/local/include"
+        #endif
+
+        static f64 macos_initial_clock = 0;
+        if (!macos_initial_clock)
+        {
+            macos_initial_clock = clock_gettime_nsec_np(CLOCK_MONOTONIC_RAW);
+        }
+
+        return (f64)(clock_gettime_nsec_np(CLOCK_MONOTONIC_RAW) - macos_initial_clock) / (f64)(1e9);
+    #else
+
     static f64 macos_perf_frequency = 0;
     static f64 macos_perf_counter = 0;
 
@@ -4186,13 +4202,18 @@ function f64 os_time() {
 
     f64 now = mach_absolute_time();
     return (now - macos_perf_counter) / macos_perf_frequency;
+
+    #endif
 }
 
-function void os_sleep(f64 seconds) {
-    u32 ms = (u32)(seconds * 1000);
-    struct timespec req = {(time_t)ms / 1000, (long)((ms % 1000) * 1000000)};
-    struct timespec rem = {0, 0};
-    nanosleep(&req, &rem);
+function void os_sleep(f64 seconds)
+{
+    u64 nanoseconds = (u64)((seconds) * (1e9));
+
+    timespec rqtp;
+    rqtp.tv_sec = nanoseconds / 1000000000;
+    rqtp.tv_nsec = nanoseconds - rqtp.tv_sec * 1000000000;
+    nanosleep(&rqtp, 0);
 }
 
 //
@@ -4237,7 +4258,7 @@ function bool os_set_clipboard_text(String text)
     // NSPasteboard *pasteboard = [NSPasteboard generalPasteboard];
     id pasteboard = objc_msgSend_id((id)objc_getClass("NSPasteboard"), sel_registerName("generalPasteboard"));
     // [pasteboard clearContents];
-    objc_msgSend(pasteboard, sel_registerName("clearContents"));
+    objc_msgSend_id(pasteboard, sel_registerName("clearContents"));
     // [pasteboard setString:str forType:NSPasteboardTypeString];
     BOOL result = objc_method(BOOL, id, SEL, id, id)(pasteboard, sel_registerName("setString:forType:"), string, (id)NSPasteboardTypeString);
 
@@ -4546,8 +4567,8 @@ function File_Info os_get_file_info(Arena *arena, String path) {
 
     char *cpath = string_to_cstr(scratch.arena, path);
 
-    struct stat64 stat_info;
-    bool file_exists = stat64(cpath, &stat_info) == 0;
+    struct stat stat_info;
+    bool file_exists = stat(cpath, &stat_info) == 0;
 
     File_Info info = {};
 
@@ -4852,6 +4873,10 @@ function u64 os_clock_cycles(void)
         u32 hi, lo;
         __asm__ __volatile__ ("rdtsc" : "=a"(lo), "=d"(hi));
         return (cast(u64)lo) | ((cast(u64)hi)<<32);
+    #elif defined(__arm64__)
+        u64 x;
+        __asm__ volatile("mrs \t%0, cntvct_el0" : "=r"(x));
+        return x;
     #endif
 }
 
@@ -5318,16 +5343,21 @@ function void table_rehash(Table_KV *it, u64 next_capacity)
 // Sets the key-value pair, replacing it if it already exists.
 function void *table_set(Table_KV *it, H_Hash hash, void *key, void *value)
 {
+    void *result = NULL;
+
     i64 index;
     if (table_find(it, hash, key, &index))
     {
         void *data = table_value(it, index);
         MemoryCopy(data, value, it->item_size);
+        result = data;
     }
     else
     {
-        table_add(it, hash, key, value);
+        result = table_add(it, hash, key, value);
     }
+    
+    return result;
 }
 
 // Adds the given key-value pair to the table, returns a pointer to the inserted item.

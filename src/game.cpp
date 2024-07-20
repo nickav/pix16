@@ -287,7 +287,7 @@ u32 DrawGetPixel(Game_Output *out, Vector2 pos)
 
 void DrawRect(Game_Output *out, Rectangle2 rect, Vector4 color)
 {
-    TimeFunction;
+    // TimeFunction;
 
     rect = abs_r2(rect);
 

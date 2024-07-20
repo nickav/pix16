@@ -33,6 +33,14 @@ static void win32__print(const char *format, ...) {
 #include "third_party/na.h"
 #include "third_party/na_math.h"
 
+//
+// NOTE(nick): game display settings
+//
+
+static i32 game_width = 320;
+static i32 game_height = 240;
+static b32 game_pixel_perfect = true;
+
 #define PROFILER 1
 #include "profiler.cpp"
 
@@ -70,12 +78,7 @@ struct Win32_Framebuffer
 //
 global b32 win32_window_is_fullscreen = false;
 global Win32_Framebuffer win32_framebuffer = {0};
-
 static b32 should_quit = false;
-
-static i32 game_width = 320;
-static i32 game_height = 240;
-static b32 game_pixel_perfect = true;
 
 function void
 win32_toggle_fullscreen(HWND hwnd)
