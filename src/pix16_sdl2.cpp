@@ -33,7 +33,7 @@ static void unix__print(const char *format, ...) {
 
 static i32 game_width = 320;
 static i32 game_height = 240;
-static b32 game_pixel_perfect = true;
+static b32 game_pixel_perfect = false;
 
 #include "game.h"
 #include "game.cpp"
@@ -56,9 +56,11 @@ int main()
     }
 
     u32 flags = SDL_WINDOW_RESIZABLE | SDL_WINDOW_SHOWN;
-    SDL_Rect screenRect = { 0,0,512,512 };
+    SDL_Rect screenRect = { 0, 0, game_width, game_height };
     SDL_Window *window = SDL_CreateWindow("pix16", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 1280, 1024, flags);
     SDL_SetWindowTitle(window, "pix16");
+
+    SDL_SetWindowMinimumSize(window, game_width, game_height);
 
     if (!window)
     {
@@ -67,7 +69,7 @@ int main()
     }
 
     SDL_Renderer *renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED);
-    SDL_Texture *texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STREAMING, screenRect.w, screenRect.h);
+    SDL_Texture *texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STREAMING, game_width, game_height);
 
     GameInit();
 
@@ -139,21 +141,12 @@ int main()
             }
         }
 
-        int pitch;
-        uint32_t *pixels;
-        SDL_LockTexture(texture, &screenRect, (void**)&pixels, &pitch);
-        for (int y = 0; y < screenRect.h; y++) {
-            for (int x = 0; x < screenRect.w; x++) {
-                // pixels[y*screenRect.w + x] = u32_color_argb(255, frame>>3, y+frame, x+frame);
-                // pixels[y*screenRect.w + x] = rgba_u32_from_u8(frame>>3, y+frame, x+frame, 255);
-                pixels[y*screenRect.w + x] = u32_color_rgba(frame>>3, y+frame, x+frame, 255);
-            }
-        }
-        SDL_UnlockTexture(texture);
-        frame += 1;
-
         // NOTE(nick): reset temporary storage
         arena_reset(temp_arena());
+
+        int window_width;
+        int window_height;
+        SDL_GetWindowSize(window, &window_width, &window_height);
 
         static Game_Input input = {};
         {
@@ -161,19 +154,44 @@ int main()
 
         static Game_Output output = {};
         // output.pixels = win32_framebuffer.pixels;
-        // output.width  = win32_framebuffer.width;
-        // output.height = win32_framebuffer.height;
+        output.width  = game_width;
+        output.height = game_height;
+
+        int pitch;
+        u32 *pixels;
+        SDL_LockTexture(texture, NULL, (void**)&pixels, &pitch);
+
+        for (int y = 0; y < screenRect.h; y++) {
+            for (int x = 0; x < screenRect.w; x++) {
+                pixels[y*screenRect.w + x] = u32_color_rgba(frame>>3, y+frame, x+frame, 255);
+            }
+        }
 
         // GameUpdateAndRender(&input, &output);
 
+        SDL_UnlockTexture(texture);
+        frame += 1;
 
-        SDL_SetRenderDrawColor(renderer, 0xFF, 0xFF, 0xFF, 0xFF);
+
+        SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
         SDL_RenderClear(renderer);
-        SDL_RenderCopy(renderer, texture, &screenRect, &screenRect);
+
+        Rectangle2i dest_rect = aspect_ratio_fit(game_width, game_height, window_width, window_height);
+        if (game_pixel_perfect)
+        {
+            dest_rect = aspect_ratio_fit_pixel_perfect(game_width, game_height, window_width, window_height);
+        }
+
+        SDL_Rect displayRect = {0};
+        displayRect.x = dest_rect.x0;
+        displayRect.y = dest_rect.y0;
+        displayRect.w = dest_rect.x1 - dest_rect.x0;
+        displayRect.h = dest_rect.y1 - dest_rect.y0;
+        SDL_RenderCopy(renderer, texture, &screenRect, &displayRect);
+
         SDL_RenderPresent(renderer);
 
         now = os_time();
-        #if 1
         f64 remaining_seconds = target_dt - (now - then);
 
         // NOTE(nick): wait for next frame
@@ -201,7 +219,6 @@ int main()
                 os_sleep(target_dt);
             }
         }
-        #endif
     }
 
     SDL_DestroyWindow(window);

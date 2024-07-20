@@ -486,7 +486,7 @@ int APIENTRY WinMain(HINSTANCE instance, HINSTANCE prev_inst, LPSTR argv, int ar
 
     win32_fatal_assert(RegisterClassExW(&wc), "Failed to register window class.");
 
-    print("Hello, %S!\n", S("World"));
+    // print("Hello, %S!\n", S("World"));
 
     M_Temp scratch = GetScratch(0, 0);
 
