@@ -423,6 +423,9 @@ function void win32_poll_xinput_controllers(Game_Input *input)
             f32 stick_x = process_xinput_stick_value(pad->sThumbLX, XINPUT_GAMEPAD_LEFT_THUMB_DEADZONE);
             f32 stick_y = process_xinput_stick_value(pad->sThumbLY, XINPUT_GAMEPAD_LEFT_THUMB_DEADZONE);
 
+            it->stick_x = stick_x;
+            it->stick_y = stick_y;
+
             it->up |= stick_y > 0;
             it->down |= stick_y < 0;
             it->left |= stick_x < 0;

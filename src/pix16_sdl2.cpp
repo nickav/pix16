@@ -45,11 +45,24 @@ inline uint32_t u32_color_rgba(uint8_t r, uint8_t g, uint8_t b, uint8_t a) { ret
 
 static b32 should_quit = false;
 
+function f32 sdl2__process_controller_value(i16 value, i16 deadzone_threshold)
+{
+    f32 result = 0;
+
+    if (value < -deadzone_threshold) {
+        result = (f32)((value + deadzone_threshold) / (32768.0f - deadzone_threshold));
+    } else if (value > deadzone_threshold) {
+        result = (f32)((value - deadzone_threshold) / (32767.0f - deadzone_threshold));
+    }
+
+    return result;
+}
+
 int main()
 {
     os_init();
 
-    if (SDL_Init(SDL_INIT_EVERYTHING) < 0)
+    if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_GAMECONTROLLER) < 0)
     {
         printf("could not initialize sdl2: %s\n", SDL_GetError());
         return 1;
@@ -58,9 +71,8 @@ int main()
     u32 flags = SDL_WINDOW_RESIZABLE | SDL_WINDOW_SHOWN;
     SDL_Rect screenRect = { 0, 0, game_width, game_height };
     SDL_Window *window = SDL_CreateWindow("pix16", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 1280, 1024, flags);
-    SDL_SetWindowTitle(window, "pix16");
-
     SDL_SetWindowMinimumSize(window, game_width, game_height);
+    SDL_CaptureMouse(SDL_TRUE);
 
     if (!window)
     {
@@ -83,6 +95,8 @@ int main()
     f64 min_dt = 0.0;
     f64 max_dt = 0.0;
     i64 frame_index = 0;
+
+    const Uint8 *keys = SDL_GetKeyboardState(NULL);
 
     while (!should_quit)
     {
@@ -150,6 +164,9 @@ int main()
         int window_height;
         SDL_GetWindowSize(window, &window_width, &window_height);
 
+        u32 window_flags = SDL_GetWindowFlags(window);
+        b32 window_is_focused = (window_flags & SDL_WINDOW_INPUT_FOCUS) != 0;
+
         Rectangle2i dest_rect = aspect_ratio_fit(game_width, game_height, window_width, window_height);
         if (game_pixel_perfect)
         {
@@ -166,8 +183,15 @@ int main()
             // Mouse
             //
 
+            // NOTE(nick): get local mouse state (doesn't respond when window is not focused)
+            u32 state = SDL_GetMouseState(0, 0);
+
             Vector2i point = {0};
-            u32 state = SDL_GetMouseState(&point.x, &point.y);
+            int wx, wy;
+            SDL_GetWindowPosition(window, &wx, &wy);
+            SDL_GetGlobalMouseState(&point.x, &point.y);
+            point.x -= wx;
+            point.y -= wy;
 
             input.mouse.position = v2(
                 game_width * ((point.x - dest_rect.x0) / (f32)r2i_width(dest_rect)),
@@ -175,6 +199,71 @@ int main()
 
             input.mouse.left = (state & SDL_BUTTON(SDL_BUTTON_LEFT)) != 0;
             input.mouse.right = (state & SDL_BUTTON(SDL_BUTTON_RIGHT)) != 0;
+
+            //
+            // Controllers
+            //
+
+            MemoryZero(&input.controllers, count_of(input.controllers) * sizeof(Controller));
+
+            Controller *player0 = &input.controllers[0];
+            player0->up    |= keys[SDL_SCANCODE_UP];
+            player0->down  |= keys[SDL_SCANCODE_DOWN];
+            player0->left  |= keys[SDL_SCANCODE_LEFT];
+            player0->right |= keys[SDL_SCANCODE_RIGHT];
+            player0->a     |= keys[SDL_SCANCODE_X];
+            player0->b     |= keys[SDL_SCANCODE_C];
+
+            player0->up    |= keys[SDL_SCANCODE_W];
+            player0->down  |= keys[SDL_SCANCODE_S];
+            player0->left  |= keys[SDL_SCANCODE_A];
+            player0->right |= keys[SDL_SCANCODE_D];
+            player0->a     |= keys[SDL_SCANCODE_J];
+            player0->b     |= keys[SDL_SCANCODE_K];
+
+            player0->start |= keys[SDL_SCANCODE_ESCAPE];
+            player0->pause |= keys[SDL_SCANCODE_P];
+
+
+            static SDL_GameController *controllers[16];
+            for (int i = 0; i < SDL_NumJoysticks(); i++) {
+                if (SDL_IsGameController(i)) {
+                    if (!controllers[i])
+                    {
+                        controllers[i] = SDL_GameControllerOpen(i);
+                    }
+                }
+            }
+
+            int controller_index = 0;
+            for (int i = 0; i < 16; i += 1)
+            {
+                if (controllers[i])
+                {
+                    Controller *player = &input.controllers[controller_index];
+                    SDL_GameController *ctrl = controllers[i];
+
+                    player->up |= SDL_GameControllerGetButton(ctrl, SDL_CONTROLLER_BUTTON_DPAD_UP);
+                    player->down |= SDL_GameControllerGetButton(ctrl, SDL_CONTROLLER_BUTTON_DPAD_DOWN);
+                    player->left |= SDL_GameControllerGetButton(ctrl, SDL_CONTROLLER_BUTTON_DPAD_LEFT);
+                    player->right |= SDL_GameControllerGetButton(ctrl, SDL_CONTROLLER_BUTTON_DPAD_RIGHT);
+
+                    player->a |= SDL_GameControllerGetButton(ctrl, SDL_CONTROLLER_BUTTON_A);
+                    player->b |= SDL_GameControllerGetButton(ctrl, SDL_CONTROLLER_BUTTON_B);
+
+                    player->start |= SDL_GameControllerGetButton(ctrl, SDL_CONTROLLER_BUTTON_START);
+                    player->pause |= SDL_GameControllerGetButton(ctrl, SDL_CONTROLLER_BUTTON_BACK);
+
+
+                    f32 stick_x = sdl2__process_controller_value(SDL_GameControllerGetAxis(ctrl, SDL_CONTROLLER_AXIS_LEFTX), 0);
+                    f32 stick_y = sdl2__process_controller_value(SDL_GameControllerGetAxis(ctrl, SDL_CONTROLLER_AXIS_LEFTY), 0);
+
+                    player->stick_x = stick_x;
+                    player->stick_y = stick_y;
+
+                    controller_index += 1;
+                }
+            }
         }
 
         static Game_Output output = {};
@@ -186,12 +275,6 @@ int main()
         output.pixels = pixels;
         output.width  = game_width;
         output.height = game_height;
-
-        // for (int y = 0; y < screenRect.h; y++) {
-        //     for (int x = 0; x < screenRect.w; x++) {
-        //         pixels[y*screenRect.w + x] = u32_color_rgba(frame>>3, y+frame, x+frame, 255);
-        //     }
-        // }
 
         GameUpdateAndRender(&input, &output);
 
@@ -215,8 +298,6 @@ int main()
         f64 remaining_seconds = target_dt - (now - then);
 
         // NOTE(nick): wait for next frame
-        u32 flags = SDL_GetWindowFlags(window);
-        b32 window_is_focused = (flags & SDL_WINDOW_INPUT_FOCUS) != 0;
         if (window_is_focused)
         {
             while (now - then < target_dt)

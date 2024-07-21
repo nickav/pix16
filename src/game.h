@@ -11,6 +11,9 @@ struct Controller
     b32 b;
     b32 start;
     b32 pause;
+
+    f32 stick_x;
+    f32 stick_y;
 };
 
 struct Mouse

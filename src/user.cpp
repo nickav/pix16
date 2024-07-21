@@ -1,3 +1,4 @@
+
 void GameUpdateAndRender(Game_Input *input, Game_Output *out)
 {
     static i32 slide_index = 0;
@@ -46,8 +47,10 @@ void GameUpdateAndRender(Game_Input *input, Game_Output *out)
     {
         DrawRect(out, r2(v2(0, 0), v2(out->width, out->height)), v4_black);
 
+        Vector4 color = v4_red;
+        if (input->mouse.left) color = v4_black;
         DrawTriangleExt(out,
-            v2(out->width * 0.5, 0), v4_red,
+            v2(out->width * 0.5, 0), color,
             input->mouse.position, v4_green,
             v2(out->width, out->height), v4_blue);
     }
