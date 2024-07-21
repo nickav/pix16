@@ -545,7 +545,7 @@ int APIENTRY WinMain(HINSTANCE instance, HINSTANCE prev_inst, LPSTR argv, int ar
 
     ShowWindow(hwnd, SW_SHOW);
 
-    Arena *permanant_storage = arena_alloc(Megabytes(8));
+    Arena *permanant_storage = arena_alloc(Megabytes(64));
 
     GameInit();
 

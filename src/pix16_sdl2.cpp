@@ -71,6 +71,8 @@ int main()
     SDL_Renderer *renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED);
     SDL_Texture *texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STREAMING, game_width, game_height);
 
+    Arena *permanant_storage = arena_alloc(Megabytes(64));
+
     GameInit();
 
     int frame = 0;
@@ -148,26 +150,50 @@ int main()
         int window_height;
         SDL_GetWindowSize(window, &window_width, &window_height);
 
+        Rectangle2i dest_rect = aspect_ratio_fit(game_width, game_height, window_width, window_height);
+        if (game_pixel_perfect)
+        {
+            dest_rect = aspect_ratio_fit_pixel_perfect(game_width, game_height, window_width, window_height);
+        }
+
         static Game_Input input = {};
         {
+            input.arena = permanant_storage;
+            input.dt = dt;
+            input.time = os_time();
+
+            //
+            // Mouse
+            //
+
+            Vector2i point = {0};
+            u32 state = SDL_GetMouseState(&point.x, &point.y);
+
+            input.mouse.position = v2(
+                game_width * ((point.x - dest_rect.x0) / (f32)r2i_width(dest_rect)),
+                game_height * ((point.y - dest_rect.y0) / (f32)r2i_height(dest_rect)));
+
+            input.mouse.left = (state & SDL_BUTTON(SDL_BUTTON_LEFT)) != 0;
+            input.mouse.right = (state & SDL_BUTTON(SDL_BUTTON_RIGHT)) != 0;
         }
 
         static Game_Output output = {};
-        // output.pixels = win32_framebuffer.pixels;
-        output.width  = game_width;
-        output.height = game_height;
-
+        
         int pitch;
         u32 *pixels;
         SDL_LockTexture(texture, NULL, (void**)&pixels, &pitch);
 
-        for (int y = 0; y < screenRect.h; y++) {
-            for (int x = 0; x < screenRect.w; x++) {
-                pixels[y*screenRect.w + x] = u32_color_rgba(frame>>3, y+frame, x+frame, 255);
-            }
-        }
+        output.pixels = pixels;
+        output.width  = game_width;
+        output.height = game_height;
 
-        // GameUpdateAndRender(&input, &output);
+        // for (int y = 0; y < screenRect.h; y++) {
+        //     for (int x = 0; x < screenRect.w; x++) {
+        //         pixels[y*screenRect.w + x] = u32_color_rgba(frame>>3, y+frame, x+frame, 255);
+        //     }
+        // }
+
+        GameUpdateAndRender(&input, &output);
 
         SDL_UnlockTexture(texture);
         frame += 1;
@@ -175,12 +201,6 @@ int main()
 
         SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
         SDL_RenderClear(renderer);
-
-        Rectangle2i dest_rect = aspect_ratio_fit(game_width, game_height, window_width, window_height);
-        if (game_pixel_perfect)
-        {
-            dest_rect = aspect_ratio_fit_pixel_perfect(game_width, game_height, window_width, window_height);
-        }
 
         SDL_Rect displayRect = {0};
         displayRect.x = dest_rect.x0;
