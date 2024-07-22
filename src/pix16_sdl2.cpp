@@ -40,10 +40,32 @@ static b32 game_pixel_perfect = false;
 
 #include "user.cpp"
 
-inline uint32_t u32_color_argb(uint8_t a, uint8_t r, uint8_t g, uint8_t b) { return (a<<24) | (r << 16) | (g << 8) | (b << 0); }
-inline uint32_t u32_color_rgba(uint8_t r, uint8_t g, uint8_t b, uint8_t a) { return (a<<24) | (r << 16) | (g << 8) | (b << 0); }
-
 static b32 should_quit = false;
+
+struct SDL2_Audio_Output
+{
+    u8 *chunks;
+    i64 length;
+    u8 *pos;
+
+    u8 *user_samples;
+};
+
+
+static Game_Output output = {};
+static SDL2_Audio_Output audio_buffer = {0};
+
+function void sdl2__audio_callback(void *userdata, Uint8 *stream, int len)
+{
+    if (audio_buffer.length == 0) {
+        return;
+    }
+
+    len = (len > audio_buffer.length ? audio_buffer.length : len);
+    MemoryCopy(stream, audio_buffer.pos, len);
+    audio_buffer.pos += len;
+    audio_buffer.length -= len;
+}
 
 function f32 sdl2__process_controller_value(i16 value, i16 deadzone_threshold)
 {
@@ -62,9 +84,9 @@ int main()
 {
     os_init();
 
-    if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_GAMECONTROLLER) < 0)
+    if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_GAMECONTROLLER) < 0)
     {
-        printf("could not initialize sdl2: %s\n", SDL_GetError());
+        printf("[main] could not initialize sdl2: %s\n", SDL_GetError());
         return 1;
     }
 
@@ -76,7 +98,7 @@ int main()
 
     if (!window)
     {
-        printf("could not create window: %s\n", SDL_GetError());
+        printf("[main] Could not create window: %s\n", SDL_GetError());
         return 1;
     }
 
@@ -84,6 +106,23 @@ int main()
     SDL_Texture *texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STREAMING, game_width, game_height);
 
     Arena *permanant_storage = arena_alloc(Megabytes(64));
+
+    SDL_AudioSpec want, have;
+    SDL_zero(want);
+    want.freq = 44100;
+    want.format = AUDIO_S16;
+    want.channels = 2;
+    want.samples = 4096;
+    want.callback = sdl2__audio_callback;
+    SDL_AudioDeviceID dev = SDL_OpenAudioDevice(NULL, 0, &want, &have, SDL_AUDIO_ALLOW_SAMPLES_CHANGE);
+    SDL_PauseAudioDevice(dev, 0);
+
+    audio_buffer.chunks = (u8 *)os_alloc(Megabytes(32));
+    audio_buffer.user_samples = (u8 *)os_alloc(Megabytes(32));
+    audio_buffer.pos = audio_buffer.chunks;
+    audio_buffer.length = 0;
+
+    printf("[SDL] Obtained - frequency: %d format: f %d s %d be %d sz %d channels: %d samples: %d\n", have.freq, SDL_AUDIO_ISFLOAT(have.format), SDL_AUDIO_ISSIGNED(have.format), SDL_AUDIO_ISBIGENDIAN(have.format), SDL_AUDIO_BITSIZE(have.format), have.channels, have.samples);
 
     GameInit();
 
@@ -265,8 +304,6 @@ int main()
                 }
             }
         }
-
-        static Game_Output output = {};
         
         int pitch;
         u32 *pixels;
@@ -276,7 +313,36 @@ int main()
         output.width  = game_width;
         output.height = game_height;
 
+        /*
+        u32 SamplesPerSecond = output.samples_per_second;
+        u32 SampleCount = audio_buffer.requested_len;
+
+        u32 BufferCount = 4;
+
+        u32 CurrentOffset = audio_buffer.queued_samples;
+        u32 TargetOffset = audio_buffer.playhead_position + SampleCount * BufferCount;
+
+        i32 NumFrames = 0;
+        if (CurrentOffset < TargetOffset)
+        {
+            NumFrames = (((i32)TargetOffset - (i32)CurrentOffset) / SampleCount);
+            if (NumFrames > 4) NumFrames = 4;
+        }
+        */
+
+        u32 UserSampleCount = 2048 * 8;
+        i16 *UserSamples = (i16 *)audio_buffer.user_samples;
+        MemoryZero(UserSamples, UserSampleCount * 2 * sizeof(i16));
+
+        output.samples_per_second = 44100;
+        output.sample_count = UserSampleCount;
+        output.samples = (i16 *)UserSamples;
+
         GameUpdateAndRender(&input, &output);
+
+        MemoryCopy(audio_buffer.pos, UserSamples, UserSampleCount * 2 * sizeof(i16));
+        audio_buffer.length += 2 * UserSampleCount * sizeof(i16);
+        output.samples_played += UserSampleCount;
 
         SDL_UnlockTexture(texture);
         frame += 1;
@@ -322,6 +388,7 @@ int main()
         }
     }
 
+    SDL_CloseAudioDevice(dev);
     SDL_DestroyWindow(window);
     SDL_Quit();
 

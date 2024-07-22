@@ -4,6 +4,8 @@ void GameUpdateAndRender(Game_Input *input, Game_Output *out)
     static i32 slide_index = 0;
 
     static b32 did_advance_slides = false;
+    
+    PlaySquare(out, 440.0f, 1.0);
 
     #if 0
     DrawRect(out, r2(v2(0, 0), v2(out->width, out->height)), v4_black);
