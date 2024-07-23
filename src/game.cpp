@@ -258,8 +258,8 @@ Font FontMake(Image image, String alphabet, Vector2i monospaced_letter_size)
 
 void DrawSetPixel(Game_Output *out, Vector2 pos, Vector4 color)
 {
-    i32 in_x = Clamp((i32)pos.x, 0, out->width);
-    i32 in_y = Clamp((i32)pos.y, 0, out->height);
+    i32 in_x = Clamp((i32)pos.x, 0, out->width - 1);
+    i32 in_y = Clamp((i32)pos.y, 0, out->height - 1);
 
     u32 out_color = rgba_u32_from_v4(color);
 
@@ -291,11 +291,11 @@ void DrawRect(Game_Output *out, Rectangle2 rect, Vector4 color)
 
     rect = abs_r2(rect);
 
-    i32 in_x0 = Clamp((i32)rect.x0, 0, out->width);
-    i32 in_x1 = Clamp((i32)rect.x1, 0, out->width);
+    i32 in_x0 = Clamp((i32)rect.x0, 0, out->width - 1);
+    i32 in_x1 = Clamp((i32)rect.x1, 0, out->width - 1);
 
-    i32 in_y0 = Clamp((i32)rect.y0, 0, out->height);
-    i32 in_y1 = Clamp((i32)rect.y1, 0, out->height);
+    i32 in_y0 = Clamp((i32)rect.y0, 0, out->height - 1);
+    i32 in_y1 = Clamp((i32)rect.y1, 0, out->height - 1);
 
     u32 out_color = rgba_u32_from_v4(color);
 
@@ -325,11 +325,11 @@ void DrawRectExt(Game_Output *out, Rectangle2 rect, Vector4 c0, Vector4 c1, Vect
 {
     rect = abs_r2(rect);
 
-    i32 in_x0 = Clamp((i32)rect.x0, 0, out->width);
-    i32 in_x1 = Clamp((i32)rect.x1, 0, out->width);
+    i32 in_x0 = Clamp((i32)rect.x0, 0, out->width - 1);
+    i32 in_x1 = Clamp((i32)rect.x1, 0, out->width - 1);
 
-    i32 in_y0 = Clamp((i32)rect.y0, 0, out->height);
-    i32 in_y1 = Clamp((i32)rect.y1, 0, out->height);
+    i32 in_y0 = Clamp((i32)rect.y0, 0, out->height - 1);
+    i32 in_y1 = Clamp((i32)rect.y1, 0, out->height - 1);
 
     u32 *at = &out->pixels[in_y0 * out->width + in_x0];
 
@@ -354,11 +354,11 @@ void DrawRectExt(Game_Output *out, Rectangle2 rect, Vector4 c0, Vector4 c1, Vect
 
 void DrawCircle(Game_Output *out, Vector2 pos, f32 radius, Vector4 color)
 {
-    i32 in_x0 = Clamp((i32)pos.x - radius, 0, out->width);
-    i32 in_x1 = Clamp((i32)pos.x + radius, 0, out->width);
+    i32 in_x0 = Clamp((i32)pos.x - radius, 0, out->width - 1);
+    i32 in_x1 = Clamp((i32)pos.x + radius, 0, out->width - 1);
 
-    i32 in_y0 = Clamp((i32)pos.y - radius, 0, out->height);
-    i32 in_y1 = Clamp((i32)pos.y + radius, 0, out->height);
+    i32 in_y0 = Clamp((i32)pos.y - radius, 0, out->height - 1);
+    i32 in_y1 = Clamp((i32)pos.y + radius, 0, out->height - 1);
 
     u32 out_color = rgba_u32_from_v4(color);
     u32 *at = &out->pixels[in_y0 * out->width + in_x0];
@@ -471,6 +471,38 @@ void DrawTriangleExt(Game_Output *out, Vector2 p0, Vector4 c0, Vector2 p1, Vecto
         }
 
         at += out->width - (in_x1 - in_x0);
+    }
+}
+
+void DrawLine(Game_Output *out, Vector2 p0, Vector2 p1, Vector4 color)
+{
+    i32 x0 = Clamp((i32)p0.x, 0, out->width - 1);
+    i32 y0 = Clamp((i32)p0.y, 0, out->height - 1);
+
+    i32 x1 = Clamp((i32)p1.x, 0, out->width - 1);
+    i32 y1 = Clamp((i32)p1.y, 0, out->height - 1);
+
+    int dx = abs(x1 - x0);
+    int dy = abs(y1 - y0);
+    int sx = (x0 < x1) ? 1 : -1;
+    int sy = (y0 < y1) ? 1 : -1;
+    int err = dx - dy;
+
+    while (1)
+    {
+        DrawSetPixel(out, v2(x0, y0), color);
+
+        if (x0 == x1 && y0 == y1) break;
+
+        int e2 = 2 * err;
+        if (e2 > -dy) {
+            err -= dy;
+            x0 += sx;
+        }
+        if (e2 < dx) {
+            err += dx;
+            y0 += sy;
+        }
     }
 }
 

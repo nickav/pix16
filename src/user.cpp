@@ -166,4 +166,6 @@ void GameUpdateAndRender(Game_Input *input, Game_Output *out)
         PlaySine(out, 783.99f, 1.0);
     }
     #endif
+
+    DrawLine(out, input->mouse.position, v2(game_width, game_height), v4_yellow);
 }

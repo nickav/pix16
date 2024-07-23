@@ -73,8 +73,6 @@ The project has only been set up for Windows and MacOS so far. Linux is in theor
 - transparency
 - see if we need to blend transparency in linear rgb
 
-- DrawLine
-
 - more robust audio mixing (we only support 8 concurrent sounds at the moment)
 - async audio API
 
