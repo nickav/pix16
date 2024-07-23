@@ -21,6 +21,14 @@ This will set up the environment variables to compile for x64 devices (for this 
 
 Now you should be able to run `build.bat` in the project root.
 
+### MacOS
+
+Install SDL2:
+
+```bash
+brew install sdl2
+```
+
 ## Building
 
 ### Windows
@@ -28,7 +36,16 @@ Now you should be able to run `build.bat` in the project root.
 To build the project run:
 
 ```batch
-build.bat
+.\build.bat
+```
+
+This will create a debug build in the `build` directory.
+
+### MacOS
+
+To build the project run:
+```bash
+./build.sh
 ```
 
 This will create a debug build in the `build` directory.
@@ -48,20 +65,15 @@ This will create a release build in the `build` directory and a distributable `p
 
 ## Other Platforms
 
-The project has only been set up for Windows so far. Other operating systems can be added by creating an entry point file and build scripts for other platforms.
-
-You could even add a backend that targets [SDL2](https://www.libsdl.org/) to support all the operating systems that it supports!
+The project has only been set up for Windows and MacOS so far. Linux is in theory possible with the SDL2 backend, but some changes to the build script would need to happen.
 
 ## TODO
 
-- add monospaced font to draw for DrawText
 - have some way to load non-monospaced fonts
 - transparency
 - see if we need to blend transparency in linear rgb
 
 - DrawLine
-
-- SDL2 backend
 
 - more robust audio mixing (we only support 8 concurrent sounds at the moment)
 - async audio API
