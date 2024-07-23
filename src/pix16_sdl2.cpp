@@ -42,31 +42,6 @@ static b32 game_pixel_perfect = false;
 
 static b32 should_quit = false;
 
-struct SDL2_Audio_Output
-{
-    u8 *chunks;
-    i64 length;
-    u8 *pos;
-
-    u8 *user_samples;
-};
-
-
-static Game_Output output = {};
-static SDL2_Audio_Output audio_buffer = {0};
-
-function void sdl2__audio_callback(void *userdata, Uint8 *stream, int len)
-{
-    if (audio_buffer.length == 0) {
-        return;
-    }
-
-    len = (len > audio_buffer.length ? audio_buffer.length : len);
-    MemoryCopy(stream, audio_buffer.pos, len);
-    audio_buffer.pos += len;
-    audio_buffer.length -= len;
-}
-
 function f32 sdl2__process_controller_value(i16 value, i16 deadzone_threshold)
 {
     f32 result = 0;
@@ -110,19 +85,17 @@ int main()
     SDL_AudioSpec want, have;
     SDL_zero(want);
     want.freq = 44100;
-    want.format = AUDIO_S16;
+    want.format = AUDIO_S16SYS;
     want.channels = 2;
-    want.samples = 4096;
-    want.callback = sdl2__audio_callback;
-    SDL_AudioDeviceID dev = SDL_OpenAudioDevice(NULL, 0, &want, &have, SDL_AUDIO_ALLOW_SAMPLES_CHANGE);
-    SDL_PauseAudioDevice(dev, 0);
+    want.samples = 256;
+    want.callback = NULL;
+    SDL_AudioDeviceID audio_device = SDL_OpenAudioDevice(NULL, 0, &want, &have, 0);
+    SDL_PauseAudioDevice(audio_device, 0);
 
-    audio_buffer.chunks = (u8 *)os_alloc(Megabytes(32));
-    audio_buffer.user_samples = (u8 *)os_alloc(Megabytes(32));
-    audio_buffer.pos = audio_buffer.chunks;
-    audio_buffer.length = 0;
+    static i64 audio_samples_queued = 0;
+    static u8 *audio_user_samples = (u8 *)os_alloc(Megabytes(4));
 
-    printf("[SDL] Obtained - frequency: %d format: f %d s %d be %d sz %d channels: %d samples: %d\n", have.freq, SDL_AUDIO_ISFLOAT(have.format), SDL_AUDIO_ISSIGNED(have.format), SDL_AUDIO_ISBIGENDIAN(have.format), SDL_AUDIO_BITSIZE(have.format), have.channels, have.samples);
+    // printf("[SDL] Obtained - frequency: %d format: f %d s %d be %d sz %d channels: %d samples: %d\n", have.freq, SDL_AUDIO_ISFLOAT(have.format), SDL_AUDIO_ISSIGNED(have.format), SDL_AUDIO_ISBIGENDIAN(have.format), SDL_AUDIO_BITSIZE(have.format), have.channels, have.samples);
 
     GameInit();
 
@@ -304,6 +277,8 @@ int main()
                 }
             }
         }
+
+        static Game_Output output = {};
         
         int pitch;
         u32 *pixels;
@@ -313,25 +288,11 @@ int main()
         output.width  = game_width;
         output.height = game_height;
 
-        /*
-        u32 SamplesPerSecond = output.samples_per_second;
-        u32 SampleCount = audio_buffer.requested_len;
+        i64 sample_target = (frame_index + 2) * (1.0 / 60) * have.freq;
+        i64 samples_queued = output.samples_played;
 
-        u32 BufferCount = 4;
-
-        u32 CurrentOffset = audio_buffer.queued_samples;
-        u32 TargetOffset = audio_buffer.playhead_position + SampleCount * BufferCount;
-
-        i32 NumFrames = 0;
-        if (CurrentOffset < TargetOffset)
-        {
-            NumFrames = (((i32)TargetOffset - (i32)CurrentOffset) / SampleCount);
-            if (NumFrames > 4) NumFrames = 4;
-        }
-        */
-
-        u32 UserSampleCount = 2048 * 8;
-        i16 *UserSamples = (i16 *)audio_buffer.user_samples;
+        u32 UserSampleCount = sample_target > samples_queued ? sample_target - samples_queued : 0;
+        i16 *UserSamples = (i16 *)audio_user_samples;
         MemoryZero(UserSamples, UserSampleCount * 2 * sizeof(i16));
 
         output.samples_per_second = 44100;
@@ -340,9 +301,11 @@ int main()
 
         GameUpdateAndRender(&input, &output);
 
-        MemoryCopy(audio_buffer.pos, UserSamples, UserSampleCount * 2 * sizeof(i16));
-        audio_buffer.length += 2 * UserSampleCount * sizeof(i16);
-        output.samples_played += UserSampleCount;
+        if (UserSampleCount)
+        {
+            SDL_QueueAudio(audio_device, UserSamples, UserSampleCount * 2 * sizeof(i16));
+            output.samples_played += output.sample_count;
+        }
 
         SDL_UnlockTexture(texture);
         frame += 1;
@@ -388,7 +351,7 @@ int main()
         }
     }
 
-    SDL_CloseAudioDevice(dev);
+    SDL_CloseAudioDevice(audio_device);
     SDL_DestroyWindow(window);
     SDL_Quit();
 
