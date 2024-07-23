@@ -1043,34 +1043,31 @@ function void mutex_destroy(Mutex *mutex);
 //
 
 #if !defined(M_Reserve)
-#error M_Reserve must be defined to use base memory.
+    #error M_Reserve must be defined to use base memory.
 #endif
 #if !defined(M_Release)
-#error M_Release must be defined to use base memory.
+    #error M_Release must be defined to use base memory.
 #endif
 #if !defined(M_Commit)
-#error M_Commit must be defined to use base memory.
+    #error M_Commit must be defined to use base memory.
 #endif
 #if !defined(M_Decommit)
-#error M_Decommit must be defined to use base memory.
+    #error M_Decommit must be defined to use base memory.
 #endif
 
-#define arena_has_virtual_backing(arena) (arena->commit_pos < U64_MAX)
-
-function Arena arena_make(u8 *data, u64 size) {
-    Arena result = {0};
-    result.data = data;
-    result.size = size;
-    result.pos = 0;
-    result.commit_pos = U64_MAX;
-    return result;
-}
+#define arena_has_virtual_backing(arena) ((arena)->commit_pos < U64_MAX)
 
 function void arena_init(Arena *arena, u8 *data, u64 size) {
     arena->data = data;
     arena->size = size;
     arena->pos  = 0;
     arena->commit_pos = U64_MAX;
+}
+
+function Arena arena_make_from_memory(u8 *data, u64 size) {
+    Arena result = {0};
+    arena_init(&result, data, size);
+    return result;
 }
 
 function Arena *arena_alloc(u64 size) {
@@ -1179,6 +1176,15 @@ function void arena_set_pos(Arena *arena, u64 pos) {
     }
 }
 
+function void arena_set_to_pointer_pos(Arena *arena, void *ptr)
+{
+    if ((u64)ptr >= (u64)arena->data && (u64)ptr < (u64)(arena->data)+arena->size)
+    {
+        u64 offset = (u64)(ptr) - ((u64)arena->data);
+        arena_set_pos(arena, offset);
+    }
+}
+
 function void arena_reset(Arena *arena) {
     arena_pop_to(arena, 0);
 }
@@ -1266,14 +1272,15 @@ function void arena_end_temp(M_Temp temp) {
     arena_pop_to(temp.arena, temp.pos);
 }
 
-thread_local Arena *m__scratch_pool[2] = {0};
+thread_local Arena *m__scratch_pool[2] = {0, 0};
 
 function M_Temp arena_get_scratch(Arena **conflicts, u64 conflict_count) {
-    if (m__scratch_pool[0] == 0) {
-        for (int i = 0; i < count_of(m__scratch_pool); i += 1)
-        {
-            m__scratch_pool[i] = arena_alloc_default();
-        }
+    if (m__scratch_pool[0] == NULL)
+    {
+        m__scratch_pool[0] = arena_alloc_default();
+        m__scratch_pool[1] = arena_alloc_default();
+        assert(m__scratch_pool[0]);
+        assert(m__scratch_pool[1]);
     }
 
     M_Temp result = {0};
@@ -1297,11 +1304,12 @@ function M_Temp arena_get_scratch(Arena **conflicts, u64 conflict_count) {
 }
 
 function Arena *temp_arena() {
-    if (m__scratch_pool[0] == 0) {
-        for (int i = 0; i < count_of(m__scratch_pool); i += 1)
-        {
-            m__scratch_pool[i] = arena_alloc_default();
-        }
+    if (m__scratch_pool[0] == NULL)
+    {
+        m__scratch_pool[0] = arena_alloc_default();
+        m__scratch_pool[1] = arena_alloc_default();
+        assert(m__scratch_pool[0]);
+        assert(m__scratch_pool[1]);
     }
 
     return m__scratch_pool[0];
@@ -1381,7 +1389,7 @@ function void memory_sort(void *base_, u64 count, u64 size, Compare_Proc cmp)
     u8 **stack_ptr = stack;
 
     for (;;) {
-        if ((limit-base) > threshold) {
+        if ((limit-base) > (i64)threshold) {
             // NOTE(bill): Quick sort
             i = base + size;
             j = limit - size;
@@ -1549,7 +1557,8 @@ function ALLOCATOR_PROC(os_allocator_proc)
 }
 
 function Allocator os_allocator() {
-    return Allocator{os_allocator_proc, 0};
+    Allocator result = {os_allocator_proc, 0};
+    return result;
 }
 
 function ALLOCATOR_PROC(arena_allocator_proc)
@@ -1592,8 +1601,10 @@ function ALLOCATOR_PROC(arena_allocator_proc)
 
 Allocator arena_allocator(Arena *arena) {
     assert(arena);
-    return Allocator{arena_allocator_proc, arena};
+    Allocator result = {arena_allocator_proc, arena};
+    return result;
 }
+
 
 //
 // Strings
@@ -4448,7 +4459,10 @@ function void *os_reserve(u64 size) {
     void *result = 0;
 
     result = mmap(NULL, size, PROT_NONE, MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);
-    //msync(result, size, MS_SYNC | MS_INVALIDATE);
+    if (result  == (void*)-1)
+    {
+        result = 0;
+    }
 
     return result;
 }
@@ -4488,9 +4502,10 @@ function bool os_decommit(void *ptr, u64 size) {
     size = AlignUpPow2(size, page_size);
 
     // NOTE(nick): ptr must be aligned to a page boundary.
-    int result = mprotect(ptr, size, PROT_NONE);
-    //madvise(ptr, size, MADV_DONTNEED); // is this too harsh?
-    return result == 0;
+    // int result = mprotect(ptr, size, PROT_NONE);
+    madvise(ptr, size, MADV_DONTNEED);
+    // return result == 0;
+    return true;
 }
 
 function bool os_release(void *ptr, u64 size) {
@@ -4695,11 +4710,12 @@ function String os_read_entire_file(Arena *arena, String path) {
     File file = os_file_open(path, FileMode_Read);
 
     u64 size = 0;
+    if (!file.has_errors)
     {
         FILE *f = (FILE *)file.handle;
         u64 prev_position = ftell(f);
         fseek(f, 0, SEEK_END);
-        u64 size = ftell(f);
+        size = ftell(f);
         fseek(f, prev_position, SEEK_SET);
     }
 
@@ -4707,7 +4723,10 @@ function String os_read_entire_file(Arena *arena, String path) {
     result.data = cast(u8 *)arena_push(arena, size);
     result.count = size;
 
-    os_file_read(&file, 0, size, result.data);
+    if (!file.has_errors)
+    {
+        os_file_read(&file, 0, size, result.data);
+    }
     os_file_close(&file);
 
     return result;
