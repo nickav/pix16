@@ -42,6 +42,60 @@ static b32 game_pixel_perfect = false;
 
 static b32 should_quit = false;
 
+#define tau 6.2831853
+float phase = 0, step = 440*tau/44100;
+
+function void sdl2__audio_callback2(void *user, Uint8 *stream, int len)
+{
+  short *out = (short*)stream;
+
+  for (int i = 0; i < len/2; i++) 
+  {
+      out[i] = (short)5000*sinf(phase);
+      i += 1;
+      out[i] = (short)5000*sinf(phase);
+
+      phase+=step;
+      if(phase >= tau){ phase -= tau; }    
+  }
+}
+
+struct Audio_Output
+{
+    i64 playback_pos;
+    // i64 samples_played;
+
+    u64 user_safe_size;
+    u8 *user_samples;
+    u8 *read;
+    u8 *write;
+
+    b32 wrapped;
+};
+
+static Audio_Output audio = {};
+
+function void sdl2__audio_callback(void *user, Uint8 *stream, int len)
+{
+    // u32 sample_count = len/(2 * sizeof(i16));
+    // audio.playback_pos += sample_count;
+
+    if (audio.read + len <= audio.write || audio.wrapped)
+    {
+        MemoryCopy(stream, audio.read, len);
+        audio.read += len;
+
+        if (audio.read > audio.user_samples + audio.user_safe_size) {
+            audio.read = audio.user_samples;
+            audio.wrapped = false;
+        }
+    }
+    else
+    {
+        MemoryZero(stream, len);
+    }
+}
+
 function f32 sdl2__process_controller_value(i16 value, i16 deadzone_threshold)
 {
     f32 result = 0;
@@ -87,13 +141,20 @@ int main()
     want.freq = 44100;
     want.format = AUDIO_S16SYS;
     want.channels = 2;
-    want.samples = 256;
-    want.callback = NULL;
+    want.samples = 512;
+    want.callback = sdl2__audio_callback;
     SDL_AudioDeviceID audio_device = SDL_OpenAudioDevice(NULL, 0, &want, &have, 0);
     SDL_PauseAudioDevice(audio_device, 0);
 
     static i64 audio_samples_queued = 0;
     static u8 *audio_user_samples = (u8 *)os_alloc(Megabytes(4));
+    static i64 audio_latency = 0;
+
+    // audio.user_samples = (u8 *)os_alloc(Megabytes(32));
+    audio.user_safe_size = Kilobytes(512);
+    audio.user_samples = (u8 *)os_alloc(audio.user_safe_size * 2);
+    audio.read = audio.user_samples;
+    audio.write = audio.user_samples;
 
     // printf("[SDL] Obtained - frequency: %d format: f %d s %d be %d sz %d channels: %d samples: %d\n", have.freq, SDL_AUDIO_ISFLOAT(have.format), SDL_AUDIO_ISSIGNED(have.format), SDL_AUDIO_ISBIGENDIAN(have.format), SDL_AUDIO_BITSIZE(have.format), have.channels, have.samples);
 
@@ -288,11 +349,22 @@ int main()
         output.width  = game_width;
         output.height = game_height;
 
-        i64 sample_target = (frame_index + 2) * (1.0 / 60) * have.freq;
-        i64 samples_queued = output.samples_played;
+        i64 LatencySamples = have.samples * 4;
+        u64 SampleSize = 2 * sizeof(i16);
 
-        u32 UserSampleCount = sample_target > samples_queued ? sample_target - samples_queued : 0;
-        i16 *UserSamples = (i16 *)audio_user_samples;
+        i64 read_target = (i64)audio.read + LatencySamples * SampleSize;
+        i64 write_target = (i64)audio.write;
+
+        u32 UserSampleCount = 0;
+        if (read_target >= write_target)
+        {
+            UserSampleCount = (read_target - write_target)/(SampleSize);
+        }
+
+        // NOTE(nick): when wrapping, we would get a garbage value here
+        if (UserSampleCount > LatencySamples) UserSampleCount = LatencySamples;
+
+        i16 *UserSamples = (i16 *)audio.write;
         MemoryZero(UserSamples, UserSampleCount * 2 * sizeof(i16));
 
         output.samples_per_second = 44100;
@@ -301,10 +373,15 @@ int main()
 
         GameUpdateAndRender(&input, &output);
 
-        if (UserSampleCount)
+        if (UserSampleCount > 0)
         {
-            SDL_QueueAudio(audio_device, UserSamples, UserSampleCount * 2 * sizeof(i16));
-            output.samples_played += output.sample_count;
+            audio.write += UserSampleCount * 2 * sizeof(i16);
+            output.samples_played += UserSampleCount;
+
+            if (audio.write > audio.user_samples + audio.user_safe_size) {
+                audio.write = audio.user_samples;
+                audio.wrapped = true;
+            }
         }
 
         SDL_UnlockTexture(texture);
