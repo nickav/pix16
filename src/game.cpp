@@ -40,6 +40,9 @@ struct Game_State
     Font_Asset  fonts[1024];
 
     Random_State rng;
+
+    Arena *arena;
+    String data_path;
 };
 
 static Game_State g_state = {0};
@@ -48,6 +51,15 @@ void GameInit()
 {
     MemoryZero(&g_state, sizeof(Game_State));
     g_state.rng = {0x6908243098231};
+
+    g_state.arena = arena_alloc(Gigabytes(1));
+
+    String data_path = os_get_executable_path();
+    if (!os_file_exists(path_join(data_path, S("data"))))
+    {
+        data_path = path_join(path_basename(data_path), S("data"));
+    }
+    g_state.data_path = string_copy(g_state.arena, data_path);
 }
 
 //
@@ -132,7 +144,7 @@ Image LoadImage(String path)
         {
             M_Temp scratch = GetScratch(0, 0);
 
-            String contents = os_read_entire_file(scratch.arena, path);
+            String contents = os_read_entire_file(scratch.arena, path_join(g_state.data_path, path));
 
             if (contents.count > 0)
             {
@@ -181,7 +193,7 @@ Sound LoadSound(String path)
         {
             M_Temp scratch = GetScratch(0, 0);
 
-            String contents = os_read_entire_file(scratch.arena, path);
+            String contents = os_read_entire_file(scratch.arena, path_join(g_state.data_path, path));
 
             if (contents.count > 0)
             {

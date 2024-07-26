@@ -716,9 +716,9 @@ function String path_join4(Arena *arena, String a, String b, String c, String d)
 function b32 path_is_absolute(String path);
 
 #if DEBUG
-    #define dump(x) print("%s = %S\n", #x, to_string(x))
+    #define Dump(x) print("%s = %S\n", #x, to_string(x))
 #else
-    #define dump(x)
+    #define Dump(x)
 #endif
 
 #endif // BASE_STRINGS_H
@@ -803,6 +803,7 @@ enum {
 typedef u64 Dense_Time;
 
 struct File_Info {
+    String path;
     String name;
     u64 size;
     Dense_Time created_at;
@@ -4577,18 +4578,19 @@ u32 unix_access_from_mode(mode_t mode) {
     return result;
 }
 
-function File_Info os_get_file_info(Arena *arena, String path) {
-    M_Temp scratch = GetScratch(&arena, 1);
+function File_Info os_get_file_info(String path) {
+    M_Temp scratch = GetScratch(0, 0);
 
     char *cpath = string_to_cstr(scratch.arena, path);
 
     struct stat stat_info;
     bool file_exists = stat(cpath, &stat_info) == 0;
 
-    File_Info info = {};
+    File_Info info = {0};
 
     if (file_exists)
     {
+        info.path             = path;
         info.name             = path_filename(path);
         info.last_accessed_at = unix_date_from_time(stat_info.st_atime);
         info.updated_at       = unix_date_from_time(stat_info.st_mtime);
@@ -4775,7 +4777,7 @@ function bool os_file_list_next(Arena *arena, File_Lister *iter, File_Info *info
         char buffer[PATH_MAX + 1];
         if (realpath(data->d_name, buffer) != NULL)
         {
-            *info = os_get_file_info(arena, string_from_cstr(buffer));
+            *info = os_get_file_info(string_from_cstr(buffer));
         }
     }
 

@@ -7,8 +7,7 @@ project_root="$(cd "$(dirname "$0")" && pwd -P)"
 exe_name="pix16_debug"
 
 pushd $project_root
-    #build_hash=$(more "$project_root/.git/refs/heads/master")
-    build_hash=""
+    build_hash=$(more "$project_root/.git/refs/heads/main")
 
     mkdir -p build
 
