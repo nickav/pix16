@@ -39,7 +39,7 @@ struct Game_State
     Sound_Asset sounds[1024];
     Font_Asset  fonts[1024];
 
-    Random_State rng;
+    Random_PCG rng;
 
     Arena *arena;
     String data_path;
@@ -273,7 +273,7 @@ void DrawSetPixel(Game_Output *out, Vector2 pos, Vector4 color)
     i32 in_x = Clamp((i32)pos.x, 0, out->width - 1);
     i32 in_y = Clamp((i32)pos.y, 0, out->height - 1);
 
-    u32 out_color = rgba_u32_from_v4(color);
+    u32 out_color = u32_rgba_from_v4(color);
 
     assert(in_y * out->width + in_x < (out->width * out->height));
 
@@ -309,7 +309,7 @@ void DrawRect(Game_Output *out, Rectangle2 rect, Vector4 color)
     i32 in_y0 = Clamp((i32)rect.y0, 0, out->height - 1);
     i32 in_y1 = Clamp((i32)rect.y1, 0, out->height - 1);
 
-    u32 out_color = rgba_u32_from_v4(color);
+    u32 out_color = u32_rgba_from_v4(color);
 
     u32 *at = &out->pixels[in_y0 * out->width + in_x0];
 
@@ -354,7 +354,7 @@ void DrawRectExt(Game_Output *out, Rectangle2 rect, Vector4 c0, Vector4 c1, Vect
 
             Vector4 sample = lerp_v4(lerp_v4(c0, c2, v), lerp_v4(c1, c3, v), u);
 
-            u32 sample_color = rgba_u32_from_v4(sample);
+            u32 sample_color = u32_rgba_from_v4(sample);
 
             *at = sample_color;
             at += 1;
@@ -372,7 +372,7 @@ void DrawCircle(Game_Output *out, Vector2 pos, f32 radius, Vector4 color)
     i32 in_y0 = Clamp((i32)pos.y - radius, 0, out->height - 1);
     i32 in_y1 = Clamp((i32)pos.y + radius, 0, out->height - 1);
 
-    u32 out_color = rgba_u32_from_v4(color);
+    u32 out_color = u32_rgba_from_v4(color);
     u32 *at = &out->pixels[in_y0 * out->width + in_x0];
 
     for (i32 y = in_y0; y < in_y1; y += 1)
@@ -411,7 +411,7 @@ void DrawTriangle(Game_Output *out, Vector2 p0, Vector2 p1, Vector2 p2, Vector4 
     i32 in_y0 = Clamp((i32)rect.y0, 0, out->height);
     i32 in_y1 = Clamp((i32)rect.y1, 0, out->height);
 
-    u32 out_color = rgba_u32_from_v4(color);
+    u32 out_color = u32_rgba_from_v4(color);
 
     u32 *at = &out->pixels[in_y0 * out->width + in_x0];
 
@@ -474,7 +474,7 @@ void DrawTriangleExt(Game_Output *out, Vector2 p0, Vector4 c0, Vector2 p1, Vecto
                 f32 u = 1.0f - v - w;
 
                 Vector4 sample = c0 * u + c1 * v + c2 * w;
-                u32 sample_color = rgba_u32_from_v4(sample);
+                u32 sample_color = u32_rgba_from_v4(sample);
 
                 *at = sample_color;
             }
@@ -598,7 +598,7 @@ void DrawImageExt(Game_Output *out, Image image, Rectangle2 rect, Vector4 color,
                 }
                 else
                 {
-                    *at = rgba_u32_from_v4(rgba_v4_from_u32(sample_color) * color);
+                    *at = u32_rgba_from_v4(v4_rgba_from_u32(sample_color) * color);
                 }
             }
 
@@ -761,12 +761,12 @@ void PlayNoise(Game_Output *out, f32 volume)
 {
     volume = clamp_f32(volume, 0, 2);
 
-    Random_State *rng = &g_state.rng;
+    Random_PCG *rng = &g_state.rng;
 
     i16 *sample_out = out->samples;
     for (int sample_index = 0; sample_index < out->sample_count; sample_index++)
     {
-        f32 random_value   = random_f32_between(rng, -1.0, 1.0);
+        f32 random_value   = random_pcg_f32_between(rng, -1.0, 1.0);
         i16 sample_value = (i16)(random_value * volume * MAX_SOUND_SIZE);
         *sample_out++ += sample_value;
         *sample_out++ += sample_value;

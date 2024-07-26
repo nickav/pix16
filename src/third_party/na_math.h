@@ -1,3 +1,32 @@
+/*
+    na_math.h - v0.04
+    Nick Aversano's C++ math helper library
+
+    This is a single header file with a bunch of useful math functions.
+===========================================================================
+
+USAGE
+    Define this in your code:
+
+    #include "na_math.h"
+
+LICENSE
+    This software is dual-licensed to the public domain and under the following
+    license: you are granted a perpetual, irrevocable license to copy, modify,
+    publish, and distribute this file as you see fit.
+
+CREDITS
+    Written by Nick Aversano
+    Credits are much appreciated but not required.
+
+VERSION HISTORY
+    0.04  - add C support and better base types
+    0.03  - added matrix functions, RGB to linear conversions, extra clamps,
+            distance, height, aspect ratio helpers
+    0.02  - Breaking API changes
+    0.01  - Initial version
+*/
+
 #ifndef NA_MATH_H
 #define NA_MATH_H
 
@@ -31,6 +60,63 @@
 #define v2f(x, y)       v2((f32)(x), (f32)(y))
 #define v3f(x, y, z)    v3((f32)(x), (f32)(y), (f32)(z))
 #define v4f(x, y, z, w) v4((f32)(x), (f32)(y), (f32)(z), (f32)(w))
+
+//
+// NOTE(nick): shared imports to make this standalone
+//
+
+#define function static
+
+#define Min(a, b) (((a) < (b)) ? (a) : (b))
+#define Max(a, b) (((a) > (b)) ? (a) : (b))
+#define Clamp(value, lower, upper) (Max(Min(value, upper), lower))
+#define ClampTop(a, b) Min(a, b)
+#define ClampBot(a, b) Max(a, b)
+#define Sign(x) (((x) > 0) - ((x) < 0))
+#define Abs(x) (((x) < 0) ? (0u - x) : (0u + x))
+
+#if !defined(__cplusplus)
+    #define bool int
+    #define true 1
+    #define false 0
+#endif
+
+#ifndef U8_MAX
+
+typedef int8_t    i8;
+typedef int16_t   i16;
+typedef int32_t   i32;
+typedef int64_t   i64;
+typedef uint8_t   u8;
+typedef uint16_t  u16;
+typedef uint32_t  u32;
+typedef uint64_t  u64;
+typedef i8        b8;
+typedef i16       b16;
+typedef i32       b32;
+typedef i64       b64;
+typedef float     f32;
+typedef double    f64;
+typedef void VoidFunction(void);
+
+#define U8_MAX  0xff
+#define I8_MAX  0x7f
+#define I8_MIN  0x80
+#define U16_MAX 0xffff
+#define I16_MAX 0x7fff
+#define I16_MIN 0x8000
+#define U32_MAX 0xffffffff
+#define I32_MAX 0x7fffffff
+#define I32_MIN 0x80000000
+#define U64_MAX 0xffffffffffffffff
+#define I64_MAX 0x7fffffffffffffff
+#define I64_MIN 0x8000000000000000
+#define F32_MIN 1.17549435e-38f
+#define F32_MAX 3.40282347e+38f
+#define F64_MIN 2.2250738585072014e-308
+#define F64_MAX 1.7976931348623157e+308
+
+#endif // U8_MAX
 
 //
 // Types
@@ -2709,7 +2795,7 @@ function u32 u32_argb_from_v4(Vector4 v)
     return result;
 }
 
-function Vector4 rgba_v4_from_u32(u32 hex)
+function Vector4 v4_rgba_from_u32(u32 hex)
 {
     Vector4 result = {0};
     result.a = (f32)((hex & 0xff000000) >> 24) / 255.f;
@@ -2719,7 +2805,7 @@ function Vector4 rgba_v4_from_u32(u32 hex)
     return result;
 }
 
-function u32 rgba_u32_from_v4(Vector4 v)
+function u32 u32_rgba_from_v4(Vector4 v)
 {
     u32 result =
         ((u32)(v.a * 255.0f) & 0xff) << 24 |
@@ -2886,22 +2972,6 @@ function b32 line_intersects_circle(Vector2 p1, Vector2 p2, Vector2 circle, f32 
     return h2 <= radius * radius;
 }
 
-function b32 point_in_triangle(Vector2 point, Vector2 v1, Vector2 v2, Vector2 v3)
-{
-    #define triangle_sign(p1, p2, p3) (p1.x - p3.x) * (p2.y - p3.y) - (p2.x - p3.x) * (p1.y - p3.y)
-
-    f32 d1 = triangle_sign(point, v1, v2);
-    f32 d2 = triangle_sign(point, v2, v3);
-    f32 d3 = triangle_sign(point, v3, v1);
-
-    #undef triangle_sign
-
-    b32 has_neg = (d1 < 0) || (d2 < 0) || (d3 < 0);
-    b32 has_pos = (d1 > 0) || (d2 > 0) || (d3 > 0);
-
-    return !(has_neg && has_pos);
-}
-
 function Vector3 screen_to_ndc(Vector2 window, Vector2 screen)
 {
     f32 x = (2.0f * screen.x) / window.width - 1.0f;
@@ -2958,6 +3028,22 @@ function Vector3 world_to_screen(Matrix4 proj, Vector3 world, Vector2 window)
     f32 z = ndc.z;
 
     return v3(x, y, z);
+}
+
+function b32 point_in_triangle(Vector2 point, Vector2 v1, Vector2 v2, Vector2 v3)
+{
+    #define triangle_sign(p1, p2, p3) (p1.x - p3.x) * (p2.y - p3.y) - (p2.x - p3.x) * (p1.y - p3.y)
+
+    f32 d1 = triangle_sign(point, v1, v2);
+    f32 d2 = triangle_sign(point, v2, v3);
+    f32 d3 = triangle_sign(point, v3, v1);
+
+    #undef triangle_sign
+
+    b32 has_neg = (d1 < 0) || (d2 < 0) || (d3 < 0);
+    b32 has_pos = (d1 > 0) || (d2 > 0) || (d3 > 0);
+
+    return !(has_neg && has_pos);
 }
 
 #endif // NA_MATH_H
