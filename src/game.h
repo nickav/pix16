@@ -92,46 +92,48 @@ struct Font
 // API
 //
 
+void GameInit();
+void GameSetState(Game_Input *input, Game_Output *out);
 void GameUpdateAndRender(Game_Input *input, Game_Output *out);
 
 //
 // Drawing API
 //
 
-void DrawSetPixel(Game_Output *out, Vector2 pos, Vector4 color);
-u32 DrawGetPixel(Game_Output *out, Vector2 pos);
+void DrawSetPixel(Vector2 pos, Vector4 color);
+u32 DrawGetPixel(Vector2 pos);
 
-void DrawRect(Game_Output *out, Rectangle2 rect, Vector4 color);
-void DrawRectExt(Game_Output *out, Rectangle2 rect, Vector4 c0, Vector4 c1, Vector4 c2, Vector4 c3);
+void DrawRect(Rectangle2 rect, Vector4 color);
+void DrawRectExt(Rectangle2 rect, Vector4 c0, Vector4 c1, Vector4 c2, Vector4 c3);
 
-void DrawCircle(Game_Output *out, Vector2 pos, f32 radius, Vector4 color);
+void DrawCircle(Vector2 pos, f32 radius, Vector4 color);
 
-void DrawTriangle(Game_Output *out, Vector2 p0, Vector2 p1, Vector2 p2, Vector4 color);
-void DrawTriangleExt(Game_Output *out, Vector2 p0, Vector4 c0, Vector2 p1, Vector4 c1, Vector2 p2, Vector4 c2);
+void DrawTriangle(Vector2 p0, Vector2 p1, Vector2 p2, Vector4 color);
+void DrawTriangleExt(Vector2 p0, Vector4 c0, Vector2 p1, Vector4 c1, Vector2 p2, Vector4 c2);
 
-void DrawLine(Game_Output *out, Vector2 p0, Vector2 p1, Vector4 color);
+void DrawLine(Vector2 p0, Vector2 p1, Vector4 color);
 
-void DrawImage(Game_Output *out, Image image, Vector2 pos);
-void DrawImageExt(Game_Output *out, Image image, Rectangle2 rect, Rectangle2 uv);
+void DrawImage(Image image, Vector2 pos);
+void DrawImageExt(Image image, Rectangle2 rect, Rectangle2 uv);
 
-void DrawText(Game_Output *out, Font font, String text, Vector2 pos);
-void DrawTextExt(Game_Output *out, Font font, String text, Vector2 pos, Vector4 color);
+void DrawText(Font font, String text, Vector2 pos);
+void DrawTextExt(Font font, String text, Vector2 pos, Vector4 color);
 
-void DrawClear(Game_Output *out, Vector4 color);
+void DrawClear(Vector4 color);
 
 //
 // Sound API
 //
 
-void PlaySine(Game_Output *out, f32 tone_hz, f32 volume);
-void PlaySquare(Game_Output *out, f32 tone_hz, f32 volume);
-void PlayTriangle(Game_Output *out, f32 tone_hz, f32 volume);
-void PlaySawtooth(Game_Output *out, f32 tone_hz, f32 volume);
-void PlayNoise(Game_Output *out, f32 volume);
+void PlaySine(f32 tone_hz, f32 volume);
+void PlaySquare(f32 tone_hz, f32 volume);
+void PlayTriangle(f32 tone_hz, f32 volume);
+void PlaySawtooth(f32 tone_hz, f32 volume);
+void PlayNoise(f32 volume);
 
-void PlaySoundStream(Game_Output *out, Sound sound, f32 volume);
-void SoundSeek(Game_Output *out, Sound sound, f32 time_in_seconds);
-f32 SoundGetTime(Game_Output *out, Sound sound);
+void PlaySoundStream(Sound sound, f32 volume);
+void SoundSeek(Sound sound, f32 time_in_seconds);
+f32 SoundGetTime(Sound sound);
 
 //
 // Assets API

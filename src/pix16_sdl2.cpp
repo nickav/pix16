@@ -161,8 +161,6 @@ int main()
 
     GameInit();
 
-    int frame = 0;
-
     f64 then = os_time();
     f64 accumulator = 0.0;
     f64 average_dt = 0.0;
@@ -171,6 +169,8 @@ int main()
     i64 frame_index = 0;
 
     const Uint8 *keys = SDL_GetKeyboardState(NULL);
+
+    SDL_RenderSetVSync(renderer, 1);
 
     while (!should_quit)
     {
@@ -378,7 +378,10 @@ int main()
         output.sample_count = UserSampleCount;
         output.samples = (i16 *)UserSamples;
 
+        GameSetState(&input, &output);
         GameUpdateAndRender(&input, &output);
+
+        SDL_UnlockTexture(texture);
 
         if (UserSampleCount > 0)
         {
@@ -390,9 +393,6 @@ int main()
                 audio.wrapped = true;
             }
         }
-
-        SDL_UnlockTexture(texture);
-        frame += 1;
 
 
         SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);

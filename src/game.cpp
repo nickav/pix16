@@ -62,6 +62,15 @@ void GameInit()
     g_state.data_path = string_copy(g_state.arena, data_path);
 }
 
+static Game_Input *input = NULL;
+static Game_Output *out  = NULL;
+
+void GameSetState(Game_Input *the_input, Game_Output *the_output)
+{
+    input = the_input;
+    out = the_output;
+}
+
 //
 // Assets API
 //
@@ -268,7 +277,7 @@ Font FontMake(Image image, String alphabet, Vector2i monospaced_letter_size)
 // Drawing API
 //
 
-void DrawSetPixel(Game_Output *out, Vector2 pos, Vector4 color)
+void DrawSetPixel(Vector2 pos, Vector4 color)
 {
     i32 in_x = Clamp((i32)pos.x, 0, out->width - 1);
     i32 in_y = Clamp((i32)pos.y, 0, out->height - 1);
@@ -281,7 +290,7 @@ void DrawSetPixel(Game_Output *out, Vector2 pos, Vector4 color)
     *at = out_color;
 }
 
-u32 DrawGetPixel(Game_Output *out, Vector2 pos)
+u32 DrawGetPixel(Vector2 pos)
 {
     u32 result = 0;
 
@@ -297,7 +306,7 @@ u32 DrawGetPixel(Game_Output *out, Vector2 pos)
     return result;
 }
 
-void DrawRect(Game_Output *out, Rectangle2 rect, Vector4 color)
+void DrawRect(Rectangle2 rect, Vector4 color)
 {
     // TimeFunction;
 
@@ -333,7 +342,7 @@ c0 ----- c1
 |        |
 c2 ----- c3
 */
-void DrawRectExt(Game_Output *out, Rectangle2 rect, Vector4 c0, Vector4 c1, Vector4 c2, Vector4 c3)
+void DrawRectExt(Rectangle2 rect, Vector4 c0, Vector4 c1, Vector4 c2, Vector4 c3)
 {
     rect = abs_r2(rect);
 
@@ -364,7 +373,7 @@ void DrawRectExt(Game_Output *out, Rectangle2 rect, Vector4 c0, Vector4 c1, Vect
     }
 }
 
-void DrawCircle(Game_Output *out, Vector2 pos, f32 radius, Vector4 color)
+void DrawCircle(Vector2 pos, f32 radius, Vector4 color)
 {
     i32 in_x0 = Clamp((i32)pos.x - radius, 0, out->width - 1);
     i32 in_x1 = Clamp((i32)pos.x + radius, 0, out->width - 1);
@@ -395,7 +404,7 @@ void DrawCircle(Game_Output *out, Vector2 pos, f32 radius, Vector4 color)
     }
 }
 
-void DrawTriangle(Game_Output *out, Vector2 p0, Vector2 p1, Vector2 p2, Vector4 color)
+void DrawTriangle(Vector2 p0, Vector2 p1, Vector2 p2, Vector4 color)
 {
     f32 min_x = min_f32(p0.x, min_f32(p1.x, p2.x));
     f32 max_x = max_f32(p0.x, max_f32(p1.x, p2.x));
@@ -431,7 +440,7 @@ void DrawTriangle(Game_Output *out, Vector2 p0, Vector2 p1, Vector2 p2, Vector4 
     }
 }
 
-void DrawTriangleExt(Game_Output *out, Vector2 p0, Vector4 c0, Vector2 p1, Vector4 c1, Vector2 p2, Vector4 c2)
+void DrawTriangleExt(Vector2 p0, Vector4 c0, Vector2 p1, Vector4 c1, Vector2 p2, Vector4 c2)
 {
     f32 min_x = min_f32(p0.x, min_f32(p1.x, p2.x));
     f32 max_x = max_f32(p0.x, max_f32(p1.x, p2.x));
@@ -486,7 +495,7 @@ void DrawTriangleExt(Game_Output *out, Vector2 p0, Vector4 c0, Vector2 p1, Vecto
     }
 }
 
-void DrawLine(Game_Output *out, Vector2 p0, Vector2 p1, Vector4 color)
+void DrawLine(Vector2 p0, Vector2 p1, Vector4 color)
 {
     i32 x0 = Clamp((i32)p0.x, 0, out->width - 1);
     i32 y0 = Clamp((i32)p0.y, 0, out->height - 1);
@@ -502,7 +511,7 @@ void DrawLine(Game_Output *out, Vector2 p0, Vector2 p1, Vector4 color)
 
     while (1)
     {
-        DrawSetPixel(out, v2(x0, y0), color);
+        DrawSetPixel(v2(x0, y0), color);
 
         if (x0 == x1 && y0 == y1) break;
 
@@ -518,7 +527,7 @@ void DrawLine(Game_Output *out, Vector2 p0, Vector2 p1, Vector4 color)
     }
 }
 
-void DrawImage(Game_Output *out, Image image, Vector2 pos)
+void DrawImage(Image image, Vector2 pos)
 {
     u32 *pixels = (u32 *)out->pixels;
 
@@ -558,7 +567,7 @@ void DrawImage(Game_Output *out, Image image, Vector2 pos)
     }
 }
 
-void DrawImageExt(Game_Output *out, Image image, Rectangle2 rect, Vector4 color, Rectangle2 uv)
+void DrawImageExt(Image image, Rectangle2 rect, Vector4 color, Rectangle2 uv)
 {
     u32 *pixels = (u32 *)out->pixels;
 
@@ -629,7 +638,7 @@ Font_Glyph FontGetGlyph(Font font, u32 character)
     return result;
 }
 
-void DrawTextExt(Game_Output *out, Font font, String text, Vector2 pos, Vector4 color)
+void DrawTextExt(Font font, String text, Vector2 pos, Vector4 color)
 {
     Vector2 cursor = pos;
 
@@ -647,7 +656,7 @@ void DrawTextExt(Game_Output *out, Font font, String text, Vector2 pos, Vector4 
         {
             Vector2 pos = cursor;
             //pos += glyph.line_offset;
-            DrawImageExt(out, font.image, r2(pos, pos + v2_from_v2i(glyph.size)), color, uv);
+            DrawImageExt(font.image, r2(pos, pos + v2_from_v2i(glyph.size)), color, uv);
         }
 
         cursor.x += glyph.size.width;
@@ -655,14 +664,14 @@ void DrawTextExt(Game_Output *out, Font font, String text, Vector2 pos, Vector4 
     }
 }
 
-void DrawText(Game_Output *out, Font font, String text, Vector2 pos)
+void DrawText(Font font, String text, Vector2 pos)
 {
-    DrawTextExt(out, font, text, pos, v4_white);
+    DrawTextExt(font, text, pos, v4_white);
 }
 
-void DrawClear(Game_Output *out, Vector4 color)
+void DrawClear(Vector4 color)
 {
-    DrawRect(out, r2(v2(0, 0), v2(out->width, out->height)), color);
+    DrawRect(r2(v2(0, 0), v2(out->width, out->height)), color);
 }
 
 //
@@ -672,7 +681,7 @@ void DrawClear(Game_Output *out, Vector4 color)
 #define MAX_CONCURRENT_SOUNDS ((f32)8)
 #define MAX_SOUND_SIZE (I16_MAX * (1.0 / MAX_CONCURRENT_SOUNDS))
 
-void PlaySine(Game_Output *out, f32 tone_hz, f32 volume)
+void PlaySine(f32 tone_hz, f32 volume)
 {
     volume = clamp_f32(volume, 0, 2);
 
@@ -695,7 +704,7 @@ void PlaySine(Game_Output *out, f32 tone_hz, f32 volume)
     }
 }
 
-void PlaySquare(Game_Output *out, f32 tone_hz, f32 volume)
+void PlaySquare(f32 tone_hz, f32 volume)
 {
     volume = clamp_f32(volume, 0, 2);
 
@@ -718,7 +727,7 @@ void PlaySquare(Game_Output *out, f32 tone_hz, f32 volume)
     }
 }
 
-void PlayTriangle(Game_Output *out, f32 tone_hz, f32 volume)
+void PlayTriangle(f32 tone_hz, f32 volume)
 {
     volume = clamp_f32(volume, 0, 2);
 
@@ -742,7 +751,7 @@ void PlayTriangle(Game_Output *out, f32 tone_hz, f32 volume)
     }
 }
 
-void PlaySawtooth(Game_Output *out, f32 tone_hz, f32 volume)
+void PlaySawtooth(f32 tone_hz, f32 volume)
 {
     volume = clamp_f32(volume, 0, 2);
 
@@ -765,7 +774,7 @@ void PlaySawtooth(Game_Output *out, f32 tone_hz, f32 volume)
     }
 }
 
-void PlayNoise(Game_Output *out, f32 volume)
+void PlayNoise(f32 volume)
 {
     volume = clamp_f32(volume, 0, 2);
 
@@ -781,7 +790,7 @@ void PlayNoise(Game_Output *out, f32 volume)
     }
 }
 
-void PlaySoundStream(Game_Output *out, Sound sound, f32 volume)
+void PlaySoundStream(Sound sound, f32 volume)
 {
     Sound_Asset *asset = (Sound_Asset *)GetAssetByIndex(&g_state.sounds, sizeof(Sound_Asset), count_of(g_state.sounds), sound.index); 
     if (!asset) return;
@@ -808,7 +817,7 @@ void PlaySoundStream(Game_Output *out, Sound sound, f32 volume)
     asset->sample_offset += sample_count;
 }
 
-f32 SoundGetTime(Game_Output *out, Sound sound)
+f32 SoundGetTime(Sound sound)
 {
     Sound_Asset *asset = (Sound_Asset *)GetAssetByIndex(&g_state.sounds, sizeof(Sound_Asset), count_of(g_state.sounds), sound.index); 
     if (!asset) return 0;
@@ -820,7 +829,7 @@ f32 SoundGetTime(Game_Output *out, Sound sound)
     return result;
 }
 
-void SoundSeek(Game_Output *out, Sound sound, f32 time_in_seconds)
+void SoundSeek(Sound sound, f32 time_in_seconds)
 {
     Sound_Asset *asset = (Sound_Asset *)GetAssetByIndex(&g_state.sounds, sizeof(Sound_Asset), count_of(g_state.sounds), sound.index); 
     if (!asset) return;
