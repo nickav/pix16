@@ -46,6 +46,8 @@ struct Game_State
 };
 
 static Game_State g_state = {0};
+static Game_Input *input = NULL;
+static Game_Output *out  = NULL;
 
 void GameInit()
 {
@@ -61,9 +63,6 @@ void GameInit()
     }
     g_state.data_path = string_copy(g_state.arena, data_path);
 }
-
-static Game_Input *input = NULL;
-static Game_Output *out  = NULL;
 
 void GameSetState(Game_Input *the_input, Game_Output *the_output)
 {
@@ -549,21 +548,38 @@ void DrawImage(Image image, Vector2 pos)
     i32 height = in_y1 - in_y0;
     i32 width = in_x1 - in_x0;
 
+    i32 src_pos_x = in_x0 - (i32)rect.x0;
+    i32 src_pos_y = in_y0 - (i32)rect.y0;
+
+    u8 *in_data = (u8 *)image.pixels;
+    u32 in_pitch = sizeof(u32) * image.size.width;
+    u8 *in_line = in_data + (src_pos_y * in_pitch) + (sizeof(u32) * src_pos_x);
+
+    u8 *out_data = (u8 *)out->pixels;
+    u32 out_pitch = sizeof(u32) * out->width;
+    u8 *out_line = out_data + (in_y0 * out_pitch) + (sizeof(u32) * in_x0);
+
+    u32 in_copy_size = sizeof(u32) * width;
+
     for (i32 y = 0; y < height; y += 1)
     {
-        for (i32 x = 0; x < width; x += 1)
+        u32 *in_pixel = (u32 *)in_line;
+        u32 *out_pixel = (u32 *)out_line;
+
+        for (int x = 0; x < width; x += 1)
         {
-            u32 sample_color = *samples;
+            u32 sample_color = *in_pixel;
             if ((sample_color & 0xff000000) != 0)
             {
-                *at = sample_color;
+                *out_pixel = sample_color;
             }
 
-            samples += 1;
-            at += 1;
+            in_pixel += 1;
+            out_pixel += 1;
         }
 
-        at += out->width - (in_x1 - in_x0);
+        in_line += in_pitch;
+        out_line += out_pitch;
     }
 }
 
@@ -671,7 +687,7 @@ void DrawText(Font font, String text, Vector2 pos)
 
 void DrawClear(Vector4 color)
 {
-    DrawRect(r2(v2(0, 0), v2(out->width, out->height)), color);
+    DrawRect( r2(v2(0, 0), v2(out->width, out->height)), color);
 }
 
 //
