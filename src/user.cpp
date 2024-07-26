@@ -53,12 +53,14 @@ void GameUpdate(Game_Input *input)
     }
 }
 
-void GameRender(Game_Output *out)
+void GameRender(Game_Input *input, Game_Output *out)
 {
     Image spr_guy = LoadImage(S("penguin_idle.png"));
 
     DrawClear(v4(0.7, 0.6, 0.8, 1.0));
     DrawImage(spr_guy, player.position - v2(16, 16));
+
+    DrawLine(v2(out->width * 0.5, out->height * 0.5), input->mouse.position, v4_white);
 }
 
 void GameUpdateAndRender(Game_Input *input, Game_Output *out)
@@ -71,7 +73,7 @@ void GameUpdateAndRender(Game_Input *input, Game_Output *out)
     }
 
     GameUpdate(input);
-    GameRender(out);
+    GameRender(input, out);
 
     // DrawSprite(spr_guy, player.position);
 }

@@ -278,15 +278,15 @@ Font FontMake(Image image, String alphabet, Vector2i monospaced_letter_size)
 
 void DrawSetPixel(Vector2 pos, Vector4 color)
 {
-    i32 in_x = Clamp((i32)pos.x, 0, out->width - 1);
-    i32 in_y = Clamp((i32)pos.y, 0, out->height - 1);
+    i32 x = (i32)pos.x;
+    i32 y = (i32)pos.y;
 
-    u32 out_color = u32_rgba_from_v4(color);
-
-    assert(in_y * out->width + in_x < (out->width * out->height));
-
-    u32 *at = &out->pixels[in_y * out->width + in_x];
-    *at = out_color;
+    if (x >= 0 && x < out->width && y >= 0 && y < out->height)
+    {
+        u32 out_color = u32_rgba_from_v4(color);
+        u32 *at = &out->pixels[y * out->width + x];
+        *at = out_color;
+    }
 }
 
 u32 DrawGetPixel(Vector2 pos)
@@ -305,17 +305,93 @@ u32 DrawGetPixel(Vector2 pos)
     return result;
 }
 
+typedef u32 OutCode;
+enum
+{
+    OutCode_LEFT   = 1,
+    OutCode_RIGHT  = 2,
+    OutCode_BOTTOM = 4,
+    OutCode_TOP    = 8,
+};
+
+OutCode computeOutCode(i32 x, i32 y, i32 max_x, i32 max_y)
+{
+    int code = 0;
+    if (x < 0) code |= OutCode_LEFT;
+    else if (x > max_x) code |= OutCode_RIGHT;
+    if (y < 0) code |= OutCode_BOTTOM;
+    else if (y > max_y) code |= OutCode_TOP;
+    return code;
+}
+
+b32 cohenSutherlandClip(i32 *in_x0, i32 *in_y0, i32 *in_x1, i32 *in_y1, i32 max_x, i32 max_y) {
+    i32 x0 = *in_x0;
+    i32 y0 = *in_y0;
+    i32 x1 = *in_x1;
+    i32 y1 = *in_y1;
+
+    int outcode0 = computeOutCode(x0, y0, max_x, max_y);
+    int outcode1 = computeOutCode(x1, y1, max_x, max_y);
+    b32 accept = 0;
+
+    while (1) {
+        if (!(outcode0 | outcode1)) {
+            // Both endpoints are inside the rectangle
+            accept = 1;
+            break;
+        } else if (outcode0 & outcode1) {
+            // Both endpoints share an outside zone (logical AND is not 0)
+            break;
+        } else {
+            // At least one endpoint is outside the rectangle
+            int outcodeOut = outcode0 ? outcode0 : outcode1;
+            int x, y;
+
+            if (outcodeOut & OutCode_TOP) {           // Point is above the rectangle
+                x = x0 + (x1 - x0) * (max_y - y0) / (y1 - y0);
+                y = max_y;
+            } else if (outcodeOut & OutCode_BOTTOM) { // Point is below the rectangle
+                x = x0 + (x1 - x0) * (0 - y0) / (y1 - y0);
+                y = 0;
+            } else if (outcodeOut & OutCode_RIGHT) {  // Point is to the right of the rectangle
+                y = y0 + (y1 - y0) * (max_x - x0) / (x1 - x0);
+                x = max_x;
+            } else if (outcodeOut & OutCode_LEFT) {   // Point is to the left of the rectangle
+                y = y0 + (y1 - y0) * (0 - x0) / (x1 - x0);
+                x = 0;
+            }
+
+            if (outcodeOut == outcode0) {
+                x0 = x;
+                y0 = y;
+                outcode0 = computeOutCode(x0, y0, max_x, max_y);
+            } else {
+                x1 = x;
+                y1 = y;
+                outcode1 = computeOutCode(x1, y1, max_x, max_y);
+            }
+        }
+    }
+
+    *in_x0 = x0;
+    *in_y0 = y0;
+    *in_x1 = x1;
+    *in_y1 = y1;
+
+    return accept;
+}
+
 void DrawRect(Rectangle2 rect, Vector4 color)
 {
     // TimeFunction;
 
     rect = abs_r2(rect);
 
-    i32 in_x0 = Clamp((i32)rect.x0, 0, out->width - 1);
-    i32 in_x1 = Clamp((i32)rect.x1, 0, out->width - 1);
+    i32 in_x0 = Clamp((i32)rect.x0, 0, out->width);
+    i32 in_x1 = Clamp((i32)rect.x1, 0, out->width);
 
-    i32 in_y0 = Clamp((i32)rect.y0, 0, out->height - 1);
-    i32 in_y1 = Clamp((i32)rect.y1, 0, out->height - 1);
+    i32 in_y0 = Clamp((i32)rect.y0, 0, out->height);
+    i32 in_y1 = Clamp((i32)rect.y1, 0, out->height);
 
     u32 out_color = u32_rgba_from_v4(color);
 
@@ -345,11 +421,11 @@ void DrawRectExt(Rectangle2 rect, Vector4 c0, Vector4 c1, Vector4 c2, Vector4 c3
 {
     rect = abs_r2(rect);
 
-    i32 in_x0 = Clamp((i32)rect.x0, 0, out->width - 1);
-    i32 in_x1 = Clamp((i32)rect.x1, 0, out->width - 1);
+    i32 in_x0 = Clamp((i32)rect.x0, 0, out->width);
+    i32 in_x1 = Clamp((i32)rect.x1, 0, out->width);
 
-    i32 in_y0 = Clamp((i32)rect.y0, 0, out->height - 1);
-    i32 in_y1 = Clamp((i32)rect.y1, 0, out->height - 1);
+    i32 in_y0 = Clamp((i32)rect.y0, 0, out->height);
+    i32 in_y1 = Clamp((i32)rect.y1, 0, out->height);
 
     u32 *at = &out->pixels[in_y0 * out->width + in_x0];
 
@@ -374,11 +450,11 @@ void DrawRectExt(Rectangle2 rect, Vector4 c0, Vector4 c1, Vector4 c2, Vector4 c3
 
 void DrawCircle(Vector2 pos, f32 radius, Vector4 color)
 {
-    i32 in_x0 = Clamp((i32)pos.x - radius, 0, out->width - 1);
-    i32 in_x1 = Clamp((i32)pos.x + radius, 0, out->width - 1);
+    i32 in_x0 = Clamp((i32)pos.x - radius, 0, out->width);
+    i32 in_x1 = Clamp((i32)pos.x + radius, 0, out->width);
 
-    i32 in_y0 = Clamp((i32)pos.y - radius, 0, out->height - 1);
-    i32 in_y1 = Clamp((i32)pos.y + radius, 0, out->height - 1);
+    i32 in_y0 = Clamp((i32)pos.y - radius, 0, out->height);
+    i32 in_y1 = Clamp((i32)pos.y + radius, 0, out->height);
 
     u32 out_color = u32_rgba_from_v4(color);
     u32 *at = &out->pixels[in_y0 * out->width + in_x0];
@@ -413,11 +489,11 @@ void DrawTriangle(Vector2 p0, Vector2 p1, Vector2 p2, Vector4 color)
 
     Rectangle2 rect = r2(v2(min_x, min_y), v2(max_x, max_y));
 
-    i32 in_x0 = Clamp((i32)rect.x0, 0, out->width - 1);
-    i32 in_x1 = Clamp((i32)rect.x1, 0, out->width - 1);
+    i32 in_x0 = Clamp((i32)rect.x0, 0, out->width);
+    i32 in_x1 = Clamp((i32)rect.x1, 0, out->width);
 
-    i32 in_y0 = Clamp((i32)rect.y0, 0, out->height - 1);
-    i32 in_y1 = Clamp((i32)rect.y1, 0, out->height - 1);
+    i32 in_y0 = Clamp((i32)rect.y0, 0, out->height);
+    i32 in_y1 = Clamp((i32)rect.y1, 0, out->height);
 
     u32 out_color = u32_rgba_from_v4(color);
 
@@ -496,11 +572,11 @@ void DrawTriangleExt(Vector2 p0, Vector4 c0, Vector2 p1, Vector4 c1, Vector2 p2,
 
 void DrawLine(Vector2 p0, Vector2 p1, Vector4 color)
 {
-    i32 x0 = Clamp((i32)p0.x, 0, out->width - 1);
-    i32 y0 = Clamp((i32)p0.y, 0, out->height - 1);
-
-    i32 x1 = Clamp((i32)p1.x, 0, out->width - 1);
-    i32 y1 = Clamp((i32)p1.y, 0, out->height - 1);
+    i32 x0 = (i32)p0.x;
+    i32 y0 = (i32)p0.y;
+    i32 x1 = (i32)p1.x;
+    i32 y1 = (i32)p1.y;
+    cohenSutherlandClip(&x0, &y0, &x1, &y1, out->width, out->height);
 
     int dx = abs(x1 - x0);
     int dy = abs(y1 - y0);
@@ -533,11 +609,11 @@ void DrawImage(Image image, Vector2 pos)
     Rectangle2 rect = r2(pos, pos + v2_from_v2i(image.size));
     rect = abs_r2(rect);
 
-    i32 in_x0 = Clamp((i32)rect.x0, 0, out->width - 1);
-    i32 in_y0 = Clamp((i32)rect.y0, 0, out->height - 1);
+    i32 in_x0 = Clamp((i32)rect.x0, 0, out->width);
+    i32 in_y0 = Clamp((i32)rect.y0, 0, out->height);
 
-    i32 in_x1 = Clamp((i32)rect.x1, 0, out->width - 1);
-    i32 in_y1 = Clamp((i32)rect.y1, 0, out->height - 1);
+    i32 in_x1 = Clamp((i32)rect.x1, 0, out->width);
+    i32 in_y1 = Clamp((i32)rect.y1, 0, out->height);
 
     if (in_x0 == in_x1 || in_y0 == in_y1) return;
     if (image.size.width == 0 || image.size.height == 0) return;
@@ -589,11 +665,11 @@ void DrawImageExt(Image image, Rectangle2 rect, Vector4 color, Rectangle2 uv)
 
     rect = abs_r2(rect);
 
-    i32 in_x0 = Clamp((i32)rect.x0, 0, out->width - 1);
-    i32 in_x1 = Clamp((i32)rect.x1, 0, out->width - 1);
+    i32 in_x0 = Clamp((i32)rect.x0, 0, out->width);
+    i32 in_y0 = Clamp((i32)rect.y0, 0, out->height);
 
-    i32 in_y0 = Clamp((i32)rect.y0, 0, out->height - 1);
-    i32 in_y1 = Clamp((i32)rect.y1, 0, out->height - 1);
+    i32 in_x1 = Clamp((i32)rect.x1, 0, out->width);
+    i32 in_y1 = Clamp((i32)rect.y1, 0, out->height);
 
     if (in_x0 == in_x1 || in_y0 == in_y1) return;
     if (image.size.width == 0 || image.size.height == 0) return;
