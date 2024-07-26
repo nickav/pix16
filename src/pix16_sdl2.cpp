@@ -33,7 +33,7 @@ static void unix__print(const char *format, ...) {
 
 static i32 game_width = 320;
 static i32 game_height = 240;
-static b32 game_pixel_perfect = false;
+static b32 game_pixel_perfect = true;
 
 #include "game.h"
 #include "game.cpp"
@@ -120,6 +120,7 @@ int main()
     }
 
     u32 flags = SDL_WINDOW_RESIZABLE | SDL_WINDOW_SHOWN;
+    // flags |= SDL_WINDOW_ALLOW_HIGHDPI;
     SDL_Rect screenRect = { 0, 0, game_width, game_height };
     SDL_Window *window = SDL_CreateWindow("pix16", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 1280, 1024, flags);
     SDL_SetWindowMinimumSize(window, game_width, game_height);
@@ -239,6 +240,12 @@ int main()
 
         u32 window_flags = SDL_GetWindowFlags(window);
         b32 window_is_focused = (window_flags & SDL_WINDOW_INPUT_FOCUS) != 0;
+
+        // int rw = 0, rh = 0;
+        // SDL_GetRendererOutputSize(renderer, &rw, &rh);
+        // float widthScale = (float)rw / (float) window_width;
+        // float heightScale = (float)rh / (float) window_height;
+        // Dump2(widthScale, heightScale);
 
         Rectangle2i dest_rect = aspect_ratio_fit(game_width, game_height, window_width, window_height);
         if (game_pixel_perfect)

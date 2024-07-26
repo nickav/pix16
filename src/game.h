@@ -117,6 +117,8 @@ void DrawImageExt(Game_Output *out, Image image, Rectangle2 rect, Rectangle2 uv)
 void DrawText(Game_Output *out, Font font, String text, Vector2 pos);
 void DrawTextExt(Game_Output *out, Font font, String text, Vector2 pos, Vector4 color);
 
+void DrawClear(Game_Output *out, Vector4 color);
+
 //
 // Sound API
 //

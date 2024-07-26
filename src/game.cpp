@@ -405,11 +405,11 @@ void DrawTriangle(Game_Output *out, Vector2 p0, Vector2 p1, Vector2 p2, Vector4 
 
     Rectangle2 rect = r2(v2(min_x, min_y), v2(max_x, max_y));
 
-    i32 in_x0 = Clamp((i32)rect.x0, 0, out->width);
-    i32 in_x1 = Clamp((i32)rect.x1, 0, out->width);
+    i32 in_x0 = Clamp((i32)rect.x0, 0, out->width - 1);
+    i32 in_x1 = Clamp((i32)rect.x1, 0, out->width - 1);
 
-    i32 in_y0 = Clamp((i32)rect.y0, 0, out->height);
-    i32 in_y1 = Clamp((i32)rect.y1, 0, out->height);
+    i32 in_y0 = Clamp((i32)rect.y0, 0, out->height - 1);
+    i32 in_y1 = Clamp((i32)rect.y1, 0, out->height - 1);
 
     u32 out_color = u32_rgba_from_v4(color);
 
@@ -525,11 +525,11 @@ void DrawImage(Game_Output *out, Image image, Vector2 pos)
     Rectangle2 rect = r2(pos, pos + v2_from_v2i(image.size));
     rect = abs_r2(rect);
 
-    i32 in_x0 = Clamp((i32)rect.x0, 0, out->width);
-    i32 in_x1 = Clamp((i32)rect.x1, 0, out->width);
+    i32 in_x0 = Clamp((i32)rect.x0, 0, out->width - 1);
+    i32 in_y0 = Clamp((i32)rect.y0, 0, out->height - 1);
 
-    i32 in_y0 = Clamp((i32)rect.y0, 0, out->height);
-    i32 in_y1 = Clamp((i32)rect.y1, 0, out->height);
+    i32 in_x1 = Clamp((i32)rect.x1, 0, out->width - 1);
+    i32 in_y1 = Clamp((i32)rect.y1, 0, out->height - 1);
 
     if (in_x0 == in_x1 || in_y0 == in_y1) return;
     if (image.size.width == 0 || image.size.height == 0) return;
@@ -537,9 +537,12 @@ void DrawImage(Game_Output *out, Image image, Vector2 pos)
     u32 *samples = image.pixels;
     u32 *at = &pixels[in_y0 * out->width + in_x0];
 
-    for (i32 y = 0; y < image.size.height; y += 1)
+    i32 height = in_y1 - in_y0;
+    i32 width = in_x1 - in_x0;
+
+    for (i32 y = 0; y < height; y += 1)
     {
-        for (i32 x = 0; x < image.size.height; x += 1)
+        for (i32 x = 0; x < width; x += 1)
         {
             u32 sample_color = *samples;
             if ((sample_color & 0xff000000) != 0)
@@ -561,11 +564,11 @@ void DrawImageExt(Game_Output *out, Image image, Rectangle2 rect, Vector4 color,
 
     rect = abs_r2(rect);
 
-    i32 in_x0 = Clamp((i32)rect.x0, 0, out->width);
-    i32 in_x1 = Clamp((i32)rect.x1, 0, out->width);
+    i32 in_x0 = Clamp((i32)rect.x0, 0, out->width - 1);
+    i32 in_x1 = Clamp((i32)rect.x1, 0, out->width - 1);
 
-    i32 in_y0 = Clamp((i32)rect.y0, 0, out->height);
-    i32 in_y1 = Clamp((i32)rect.y1, 0, out->height);
+    i32 in_y0 = Clamp((i32)rect.y0, 0, out->height - 1);
+    i32 in_y1 = Clamp((i32)rect.y1, 0, out->height - 1);
 
     if (in_x0 == in_x1 || in_y0 == in_y1) return;
     if (image.size.width == 0 || image.size.height == 0) return;
@@ -655,6 +658,11 @@ void DrawTextExt(Game_Output *out, Font font, String text, Vector2 pos, Vector4 
 void DrawText(Game_Output *out, Font font, String text, Vector2 pos)
 {
     DrawTextExt(out, font, text, pos, v4_white);
+}
+
+void DrawClear(Game_Output *out, Vector4 color)
+{
+    DrawRect(out, r2(v2(0, 0), v2(out->width, out->height)), color);
 }
 
 //
