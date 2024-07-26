@@ -665,6 +665,9 @@ void DrawImageExt(Image image, Rectangle2 rect, Vector4 color, Rectangle2 uv)
 
     rect = abs_r2(rect);
 
+    i32 width = (i32)r2_width(rect);
+    i32 height = (i32)r2_height(rect);
+
     i32 in_x0 = Clamp((i32)rect.x0, 0, out->width);
     i32 in_y0 = Clamp((i32)rect.y0, 0, out->height);
 
@@ -674,6 +677,9 @@ void DrawImageExt(Image image, Rectangle2 rect, Vector4 color, Rectangle2 uv)
     if (in_x0 == in_x1 || in_y0 == in_y1) return;
     if (image.size.width == 0 || image.size.height == 0) return;
 
+    i32 src_pos_x = in_x0 - (i32)rect.x0;
+    i32 src_pos_y = in_y0 - (i32)rect.y0;
+    
     u32 *samples = image.pixels;
     u32 *at = &pixels[in_y0 * out->width + in_x0];
 
@@ -683,15 +689,21 @@ void DrawImageExt(Image image, Rectangle2 rect, Vector4 color, Rectangle2 uv)
     {
         for (i32 x = in_x0; x < in_x1; x += 1)
         {
-            f32 u = (x - in_x0) / (f32)(in_x1 - in_x0);
-            f32 v = (y - in_y0) / (f32)(in_y1 - in_y0);
+            f32 u = (x - in_x0 + src_pos_x) / (f32)(width);
+            f32 v = (y - in_y0 + src_pos_y) / (f32)(height);
 
             // remap to input uv range
             u = uv.x0 + u * (uv.x1 - uv.x0);
             v = uv.y0 + v * (uv.y1 - uv.y0);
 
+            if (u < 0) u += 1;
+            if (v < 0) v += 1;
+
             i32 sample_x = (i32)(u * image.size.width) % image.size.width;
             i32 sample_y = (i32)(v * image.size.height) % image.size.height;
+
+            assert((sample_x >= 0 && sample_x < image.size.width) && (sample_y >= 0 && sample_y < image.size.height));
+
             u32 sample_color = image.pixels[sample_y * image.size.width + sample_x];
 
             if ((sample_color & 0xff000000) != 0)
@@ -712,6 +724,65 @@ void DrawImageExt(Image image, Rectangle2 rect, Vector4 color, Rectangle2 uv)
         at += out->width - (in_x1 - in_x0);
     }
 }
+
+#if 0
+void DrawSpriteExt(Image src, Vector2 in_src_position, Vector2 in_src_size, Vector2 in_dest_position, Vector4 color)
+{
+    Vector2i src_position = v2i_from_v2(in_src_position);
+    Vector2i src_size = v2i_from_v2(in_src_size);
+    Vector2i dest_position = v2i_from_v2(in_dest_position);
+
+    if (src.size.width == 0 || src.size.height == 0) return;
+
+    src_size.x = Min(src_size.x, src.size.x);
+    src_size.y = Min(src_size.y, src.size.y);
+
+    assert(src_size.x + dest_position.x <= out->width);
+    assert(src_size.y + dest_position.y <= out->height);
+
+    if (src_size.x == 0 || src_size.y == 0) return;
+
+    u8 *in_data = (u8 *)src.pixels;
+    u32 in_pitch = sizeof(u32) * src.size.width;
+    u8 *in_line = in_data + (src_position.y * in_pitch) + (sizeof(u32) * src_position.x);
+
+    u8 *out_data = (u8 *)out->pixels;
+    u32 out_pitch = sizeof(u32) * out->width;
+    u8 *out_line = out_data + (dest_position.y * out_pitch) + (sizeof(u32) * dest_position.x);
+
+    u32 in_copy_size = sizeof(u32) * src_size.x;
+
+    b32 color_is_white = color.r == 1 && color.g == 1 && color.b == 1 && color.a == 1;
+
+    for (i32 y = 0; y < src_size.height; y += 1)
+    {
+        u32 *in_pixel = (u32 *)in_line;
+        u32 *out_pixel = (u32 *)out_line;
+
+        for (int x = 0; x < src_size.width; x += 1)
+        {
+            u32 sample_color = *in_pixel;
+            if ((sample_color & 0xff000000) != 0)
+            {
+                if (color_is_white)
+                {
+                    *out_pixel = sample_color;
+                }
+                else
+                {
+                    *out_pixel = u32_rgba_from_v4(v4_rgba_from_u32(sample_color) * color);
+                }
+            }
+
+            in_pixel += 1;
+            out_pixel += 1;
+        }
+
+        in_line += in_pitch;
+        out_line += out_pitch;
+    }
+}
+#endif
 
 Font_Glyph FontGetGlyph(Font font, u32 character)
 {
