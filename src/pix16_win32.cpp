@@ -76,8 +76,8 @@ struct Win32_Framebuffer
 //
 // NOTE(nick): win32 globals
 //
-global b32 win32_window_is_fullscreen = false;
-global Win32_Framebuffer win32_framebuffer = {0};
+static b32 win32_window_is_fullscreen = false;
+static Win32_Framebuffer win32_framebuffer = {0};
 static b32 should_quit = false;
 
 function void
@@ -705,6 +705,7 @@ int APIENTRY WinMain(HINSTANCE instance, HINSTANCE prev_inst, LPSTR argv, int ar
 
         profiler__begin();
 
+        GameSetState(&input, &output);
         GameUpdateAndRender(&input, &output);
 
         profiler__end();

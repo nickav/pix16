@@ -5365,7 +5365,7 @@ function void mutex_destroy(Mutex *mutex) {
     #error Not implemented
 #endif
 
-#if OS_WINDOWS || OS_MACOS
+#if OS_LINUX || OS_MACOS
     #include <stdlib.h>
 #include <dirent.h>
 #include <sys/stat.h>
