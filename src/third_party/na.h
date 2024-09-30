@@ -981,10 +981,16 @@ function String string_chop_last_slash(String string);
 function String string_skip_last_slash(String string);
 
 function String string_trim_whitespace(String str);
+function String string_eat_whitespace(String str);
 function String string_remove(Arena *arena, String str, String remove);
 function String string_strip(Arena *arena, String str, String chars);
 
 function u64 string_hash(String str);
+
+function void string_to_lower(String *str);
+function void string_to_upper(String *str);
+function String string_lower(Arena *arena, String str);
+function String string_upper(Arena *arena, String str);
 
 // Path Helpers
 function String path_filename(String path);
@@ -1004,11 +1010,14 @@ function String string_from_time(f64 time_in_seconds, String_Time_Options option
 
 
 #if DEBUG
-    #define dump(x) print("%s = %S\n", #x, to_string(x))
+#if LANG_CPP
     #define Dump(x) print("%s = %S\n", #x, to_string(x))
     #define Dump2(x, y) print("%s = %S, %s = %S\n", #x, to_string(x), #y, to_string(y))
 #else
-    #define dump(x)
+    #define Dump(x)
+    #define Dump2(x, y)
+#endif
+#else
     #define Dump(x)
     #define Dump2(x, y)
 #endif
@@ -1325,7 +1334,6 @@ function void os_attach_to_debugger(b32 pause);
 
 typedef struct Thread Thread;
 struct Thread {
-    u32 id;
     void *handle;
 };
 
@@ -1342,9 +1350,6 @@ struct Mutex {
     void *handle;
 };
 
-// Basic
-function u32 thread_get_id();
-
 #if COMPILER_MSVC
     #define atomic_read_barrier() _ReadBarrier()
     #define atomic_write_barrier() _WriteBarrier()
@@ -1359,23 +1364,24 @@ function u64 atomic_exchange_u64(u64 volatile *value, u64 New);
 function u64 atomic_add_u64(u64 volatile *value, u64 Addend);
 
 // Threads
-function Thread thread_create(Thread_Proc *proc, void *data, u64 copy_size);
-function void thread_pause(Thread thread);
-function void thread_resume(Thread thread);
-function void thread_detach(Thread thread);
-function u32 thread_await(Thread thread);
+function u64 os_thread_get_id();
+function Thread os_thread_create(Thread_Proc *proc, void *data, u64 copy_size);
+function void os_thread_pause(Thread thread);
+function void os_thread_resume(Thread thread);
+function void os_thread_detach(Thread thread);
+function u32 os_thread_await(Thread thread);
 
 // Data Structures
-function Semaphore semaphore_create(u32 max_count);
-function void semaphore_signal(Semaphore *sem);
-function void semaphore_wait_for(Semaphore *sem, bool infinite);
-function void semaphore_destroy(Semaphore *sem);
+function Semaphore os_semaphore_create(u32 max_count);
+function void os_semaphore_signal(Semaphore *sem);
+function void os_semaphore_wait_for(Semaphore *sem, bool infinite);
+function void os_semaphore_destroy(Semaphore *sem);
 
-function Mutex mutex_create(u32 spin_count);
-function void mutex_aquire_lock(Mutex *mutex);
-function bool mutex_try_aquire_lock(Mutex *mutex);
-function void mutex_release_lock(Mutex *mutex);
-function void mutex_destroy(Mutex *mutex);
+function Mutex os_mutex_create(u32 spin_count);
+function void os_mutex_aquire_lock(Mutex *mutex);
+function bool os_mutex_try_aquire_lock(Mutex *mutex);
+function void os_mutex_release_lock(Mutex *mutex);
+function void os_mutex_destroy(Mutex *mutex);
 
 //
 // Workers
@@ -2020,6 +2026,65 @@ Allocator arena_allocator(Arena *arena) {
 
 #include <stdarg.h>
 
+
+#if !defined(PrintToBuffer) && defined(STB_SPRINTF_H_INCLUDE)
+
+#if OS_WINDOWS
+    #include "engine/os/win32/win32_main.h"
+
+    function char *win32__print_callback(const char *buf, void *user, int len) {
+        DWORD bytes_written;
+        HANDLE handle = GetStdHandle(STD_OUTPUT_HANDLE);
+        WriteFile(handle, buf, len, &bytes_written, 0);
+        return (char *)buf;
+    }
+
+    #define PrintToBuffer stbsp_vsnprintf
+
+    __PrintFunction(1,2)
+    function void win32__print(__FormatString const char *format, ...) {
+        char buffer[1024];
+
+        va_list args;
+        va_start(args, format);
+        stbsp_vsprintfcb(win32__print_callback, 0, buffer, format, args);
+        va_end(args);
+    }
+
+    #if COMPILER_MSVC
+        // NOTE(nick): force MSVC to check the arguments to this function
+        // #define print(...) (false && printf(__VA_ARGS__), win32__print(__VA_ARGS__))
+        #define print(...) win32__print(__VA_ARGS__)
+    #elif COMPILER_CLANG
+        #define print(...) win32__print(__VA_ARGS__)
+    #endif
+
+#endif // OS_WINDOWS
+
+#if OS_MACOS || OS_LINUX
+    char *unix__print_callback(const char *buf, void *user, int len) {
+        fprintf(stdout, "%.*s", len, buf);
+        return (char *)buf;
+    }
+
+    __PrintFunction(1,2)
+    void unix__print(const char *format, ...) {
+        char buffer[1024];
+
+        va_list args;
+        va_start(args, format);
+        stbsp_vsprintfcb(unix__print_callback, 0, buffer, format, args);
+        fflush(stdout);
+
+        va_end(args);
+    }
+
+    #define PrintToBuffer stbsp_vsnprintf
+    #define print unix__print
+#endif // OS_MACOS || OS_LINUX
+
+#endif // !defined(PrintToBuffer) && defined(STB_SPRINTF_H_INCLUDE)
+    
 #ifndef PrintToBuffer
 
 #include <stdio.h>
@@ -3318,6 +3383,17 @@ function String string_trim_whitespace(String str)
     return result;
 }
 
+function String string_eat_whitespace(String str)
+{
+    String result = str;
+    while (result.count > 0 && char_is_whitespace(result.data[0]))
+    {
+        result.data  += 1;
+        result.count -= 1;
+    }
+    return result;
+}
+
 function String string_remove(Arena *arena, String str, String remove)
 {
     return string_replace(arena, str, remove, S(""), 0);
@@ -3343,6 +3419,36 @@ function u64 string_hash(String str)
         u8 c = str.data[i];
         result = ((result << 5) + result) + c;
     }
+    return result;
+}
+
+function void string_to_lower(String *str)
+{
+    for (i64 i = 0; i < str->count; i += 1)
+    {
+        str->data[i] = char_to_lower(str->data[i]);
+    }
+}
+
+function void string_to_upper(String *str)
+{
+    for (i64 i = 0; i < str->count; i += 1)
+    {
+        str->data[i] = char_to_upper(str->data[i]);
+    }
+}
+
+function String string_lower(Arena *arena, String str)
+{
+    String result = string_copy(arena, str);
+    string_to_lower(&result);
+    return result;
+}
+
+function String string_upper(Arena *arena, String str)
+{
+    String result = string_copy(arena, str);
+    string_to_upper(&result);
     return result;
 }
 
@@ -3432,18 +3538,18 @@ function b32 path_is_absolute(String path)
 // Timing
 //
 
-#if 0
 function String string_from_time(f64 time_in_seconds, String_Time_Options options)
 {
     f64 time = time_in_seconds;
 
-    f64 fractional_ms = (time - floor_f64(time));
+    f64 fractional_ms = (time - (u64)time);
     time -= fractional_ms;
     u32 ms = (u32)(fractional_ms * 1000.0);
 
-    i32 s = (i32)mod_f64(time, 60.0);
-    i32 m = (i32)mod_f64(time / 60.0, 60.0);
-    i32 h = (i32)round_f64(time / (60.0 * 60.0));
+    i32 s = (i32)(time) % 60;
+    i32 m = (i32)(time / 60.0) % 60;
+    f64 hpart = time / (60.0 * 60.0);
+    i32 h = (i32)(hpart + 0.5);
 
     if (time_in_seconds < 0)
     {
@@ -3472,7 +3578,6 @@ function String string_from_time(f64 time_in_seconds, String_Time_Options option
 
     return sprint("%s%02d:%02d", sign,m,s);
 }
-#endif
 
 //
 // String Conversions
@@ -4875,10 +4980,10 @@ struct Win32_Thread_Params
 // Basic
 //
 
-function u32 thread_get_id() {
+function u64 os_thread_get_id() {
     u8 *ThreadLocalStorage = (u8 *)__readgsqword(0x30);
     u32 result = *(u32 *)(ThreadLocalStorage + 0x48);
-    return result;
+    return (u64)result;
 }
 
 function u32 atomic_compare_exchange_u32(u32 volatile *value, u32 New, u32 Expected) {
@@ -4916,7 +5021,7 @@ DWORD WINAPI win32_thread_proc(LPVOID lpParameter) {
     return result;
 }
 
-function Thread thread_create(Thread_Proc *proc, void *data, u64 copy_size) {
+function Thread os_thread_create(Thread_Proc *proc, void *data, u64 copy_size) {
     Win32_Thread_Params *params = (Win32_Thread_Params *)os_alloc(sizeof(Win32_Thread_Params) + copy_size);
     params->proc = proc;
     params->data = data;
@@ -4931,26 +5036,25 @@ function Thread thread_create(Thread_Proc *proc, void *data, u64 copy_size) {
 
     Thread result = {0};
     result.handle = handle;
-    result.id = thread_id;
     return result;
 }
 
-function void thread_pause(Thread thread) {
+function void os_thread_pause(Thread thread) {
     HANDLE handle = (HANDLE)thread.handle;
     SuspendThread(handle);
 }
 
-function void thread_resume(Thread thread) {
+function void os_thread_resume(Thread thread) {
     HANDLE handle = (HANDLE)thread.handle;
     ResumeThread(handle);
 }
 
-function void thread_detach(Thread thread) {
+function void os_thread_detach(Thread thread) {
     HANDLE handle = (HANDLE)thread.handle;
     CloseHandle(handle);
 }
 
-function u32 thread_await(Thread thread) {
+function u32 os_thread_await(Thread thread) {
     HANDLE handle = (HANDLE)thread.handle;
     WaitForSingleObject(handle, INFINITE);
     DWORD result;
@@ -5028,7 +5132,8 @@ function void mutex_destroy(Mutex *mutex) {
     }
 }
 #elif OS_MACOS
-    #include <mach/clock.h>
+    
+#include <mach/clock.h>
 #include <mach/mach_time.h>
 #include <mach/mach_host.h>
 #include <mach/mach_port.h>
@@ -5163,10 +5268,22 @@ function void os_sleep(f64 seconds)
 {
     u64 nanoseconds = (u64)((seconds) * (1e9));
 
-    timespec rqtp;
+    struct timespec rqtp;
     rqtp.tv_sec = nanoseconds / 1000000000;
     rqtp.tv_nsec = nanoseconds - rqtp.tv_sec * 1000000000;
     nanosleep(&rqtp, 0);
+}
+
+function f64 os_caret_blink_time()
+{
+    f32 seconds = 500.0 / 1000.0;
+    return seconds;
+}
+
+function f64 os_double_click_time()
+{
+    f32 seconds = 500.0 / 1000.0;
+    return seconds;
 }
 
 //
@@ -5178,9 +5295,14 @@ function void os_sleep(f64 seconds)
 #include <objc/message.h>
 #include <objc/NSObjCRuntime.h>
 
-typedef void* macos_NSString;
-typedef macos_NSString* NSPasteboardType;
-import NSPasteboardType const NSPasteboardTypeString; // Available MacOS 10.6
+#ifdef __OBJC__
+@class NSString;
+#else
+typedef void NSString;
+#endif
+
+typedef NSString* NSPasteboardType;
+extern NSPasteboardType const NSPasteboardTypeString; // Available MacOS 10.6
 
 #define objc_msgSend_id ((id (*)(id, SEL))objc_msgSend)
 #define objc_method(ReturnType, ...) ((ReturnType (*)(__VA_ARGS__))objc_msgSend)
@@ -5195,7 +5317,7 @@ function String os_get_clipboard_text()
     // char *text = [string UTF8String];
     char *text = objc_method(char*, id, SEL)(string, sel_registerName("UTF8String"));
 
-    auto result = string_copy(temp_arena(), string_from_cstr(text));
+    String result = string_copy(temp_arena(), string_from_cstr(text));
     return result;
 }
 
@@ -5290,7 +5412,7 @@ function bool os_shell_open(String path)
 // Make sure this fits into the handle pointer!
 StaticAssert(sizeof(semaphore_t) <= sizeof(void *), "check_semaphore_size");
 
-function Semaphore semaphore_create(u32 max_count) {
+function Semaphore os_semaphore_create(u32 max_count) {
     Semaphore result = {0};
 
     mach_port_t self = mach_task_self();
@@ -5304,15 +5426,15 @@ function Semaphore semaphore_create(u32 max_count) {
     return result;
 }
 
-function void semaphore_signal(Semaphore *sem) {
-    auto handle = cast(semaphore_t *)sem->handle;
+function void os_semaphore_signal(Semaphore *sem) {
+    semaphore_t *handle = cast(semaphore_t *)sem->handle;
     kern_return_t ret = semaphore_signal(*handle);
     assert(ret == KERN_SUCCESS);
 }
 
-function void semaphore_wait_for(Semaphore *sem, bool infinite) {
+function void os_semaphore_wait_for(Semaphore *sem, bool infinite) {
     kern_return_t ret;
-    auto handle = cast(semaphore_t *)sem->handle;
+    semaphore_t *handle = cast(semaphore_t *)sem->handle;
 
     if (infinite) {
         ret = semaphore_wait(*handle);
@@ -5324,15 +5446,15 @@ function void semaphore_wait_for(Semaphore *sem, bool infinite) {
     assert(ret == KERN_SUCCESS);
 }
 
-function void semaphore_destroy(Semaphore *sem) {
+function void os_semaphore_destroy(Semaphore *sem) {
     mach_port_t self = mach_task_self();
-    auto handle = cast(semaphore_t *)sem->handle;
+    semaphore_t *handle = cast(semaphore_t *)sem->handle;
     semaphore_destroy(self, *handle);
     os_free(handle); // @Memory @Cleanup
     handle = 0;
 }
 
-function Mutex mutex_create(u32 spin_count) {
+function Mutex os_mutex_create(u32 spin_count) {
     Mutex result = {0};
 
     result.handle = os_alloc(sizeof(pthread_mutex_t));
@@ -5343,19 +5465,19 @@ function Mutex mutex_create(u32 spin_count) {
     return result;
 }
 
-function void mutex_aquire_lock(Mutex *mutex) {
+function void os_mutex_aquire_lock(Mutex *mutex) {
     pthread_mutex_lock(cast(pthread_mutex_t *)mutex->handle);
 }
 
-function bool mutex_try_aquire_lock(Mutex *mutex) {
+function bool os_mutex_try_aquire_lock(Mutex *mutex) {
     return pthread_mutex_trylock(cast(pthread_mutex_t *)mutex->handle) != 0;
 }
 
-function void mutex_release_lock(Mutex *mutex) {
+function void os_mutex_release_lock(Mutex *mutex) {
     pthread_mutex_unlock(cast(pthread_mutex_t *)mutex->handle);
 }
 
-function void mutex_destroy(Mutex *mutex) {
+function void os_mutex_destroy(Mutex *mutex) {
     // @Robustness: track if it's been released before deleting?
     pthread_mutex_destroy(cast(pthread_mutex_t *)mutex->handle);
     os_free(mutex->handle);
@@ -5365,7 +5487,7 @@ function void mutex_destroy(Mutex *mutex) {
     #error Not implemented
 #endif
 
-#if OS_LINUX || OS_MACOS
+#if OS_WINDOWS || OS_MACOS
     #include <stdlib.h>
 #include <dirent.h>
 #include <sys/stat.h>
@@ -5373,12 +5495,32 @@ function void mutex_destroy(Mutex *mutex) {
 #include <stdio.h>
 
 #include <sys/mman.h>
+#include <stdatomic.h>
 
 typedef struct Unix_File_Lister Unix_File_Lister;
 struct Unix_File_Lister {
     char *find_path;
     DIR *handle;
 };
+
+//
+// Basic
+//
+
+function u32 atomic_compare_exchange_u32(volatile u32 *value, u32 new_value, u32 expected) {
+    atomic_compare_exchange_strong((_Atomic u32 *)value, &expected, new_value);
+    return expected;
+}
+
+function u64 atomic_exchange_u64(volatile u64 *value, u64 new_value) {
+    return atomic_exchange((_Atomic u64 *)value, new_value);
+}
+
+function u64 atomic_add_u64(volatile u64 *value, u64 addend) {
+    // NOTE: Returns the original value _prior_ to adding
+    u64 result = atomic_fetch_add((_Atomic u64 *)value, addend);
+    return result;
+}
 
 //
 // Timing
@@ -5783,7 +5925,8 @@ function bool os_delete_directory(String path) {
 #include <sys/resource.h> // setpriority
 
 typedef struct Unix_Thread_Params Unix_Thread_Params;
-struct Unix_Thread_Params {
+struct Unix_Thread_Params
+{
     Thread_Proc *proc;
     void *data;
 };
@@ -5802,13 +5945,20 @@ void *unix_thread_proc(void *data) {
     return (void *)result;
 }
 
-function Thread thread_create(Thread_Proc *proc, void *data, u64 copy_size) {
-    Unix_Thread_Params *params = (Unix_Thread_Params *)os_alloc(sizeof(Unix_Thread_Params) + copy_size);
+function u64 os_thread_get_id()
+{
+    pthread_t self = pthread_self();
+    return (u64)self;
+}
+
+function Thread os_thread_create(Thread_Proc *proc, void *data, u64 copy_size)
+{
+    Unix_Thread_Params *params = (Unix_Thread_Params *)os_alloc(AlignUpPow2(sizeof(Unix_Thread_Params), 64) + copy_size);
     params->proc = proc;
     params->data = data;
     if (copy_size)
     {
-        params->data = params + sizeof(Unix_Thread_Params);
+        params->data = params + AlignUpPow2(sizeof(Unix_Thread_Params), 64);
         MemoryCopy(params->data, data, copy_size);
     }
 
@@ -5820,12 +5970,12 @@ function Thread thread_create(Thread_Proc *proc, void *data, u64 copy_size) {
     return result;
 }
 
-function void thread_detach(Thread thread) {
+function void os_thread_detach(Thread thread) {
     pthread_t tid = (pthread_t)thread.handle;
     pthread_detach(tid);
 }
 
-function u32 thread_await(Thread thread) {
+function u32 os_thread_await(Thread thread) {
     pthread_t tid = (pthread_t)thread.handle;
     void *result = 0;
     pthread_join(tid, &result);
@@ -6056,7 +6206,7 @@ function u32 os__worker_thread_proc(void *data)
         b32 we_should_sleep = os__do_next_work_queue_entry(queue);
 
         if (we_should_sleep) {
-            semaphore_wait_for(&queue->semaphore, true);
+            os_semaphore_wait_for(&queue->semaphore, true);
         }
     }
 }
@@ -6069,19 +6219,21 @@ function void work_queue_init(Work_Queue *queue, u64 thread_count)
     queue->next_entry_to_write = 0;
     queue->next_entry_to_read = 0;
 
-    queue->semaphore = semaphore_create(thread_count);
+    queue->semaphore = os_semaphore_create(thread_count);
 
     for (u32 i = 0; i < thread_count; i++) {
         Worker_Params params = {0};
         params.queue = queue;
 
-        Thread thread = thread_create(os__worker_thread_proc, &params, sizeof(Worker_Params));
-        thread_detach(thread);
+        Thread thread = os_thread_create(os__worker_thread_proc, &params, sizeof(Worker_Params));
+        os_thread_detach(thread);
     }
 }
 
 function void work_queue_add_entry(Work_Queue *queue, Worker_Proc *callback, void *data)
 {
+    assert(queue->semaphore.handle != NULL);
+
     // TODO(casey): Switch to InterlockedCompareExchange eventually
     // so that any thread can add?
     u32 new_next_entry_to_write = (queue->next_entry_to_write + 1) % count_of(queue->entries);
@@ -6096,7 +6248,7 @@ function void work_queue_add_entry(Work_Queue *queue, Worker_Proc *callback, voi
 
     queue->next_entry_to_write = new_next_entry_to_write;
 
-    semaphore_signal(&queue->semaphore);
+    os_semaphore_signal(&queue->semaphore);
 }
 
 
