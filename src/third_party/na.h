@@ -9,6 +9,9 @@
 USAGE
     Define this in your source file:
 
+    #define impl
+    #include "na.h"
+
 LICENSE
     This software is dual-licensed to the public domain and under the following
     license: you are granted a perpetual, irrevocable license to copy, modify,
@@ -611,6 +614,28 @@ int na__assert(bool cond, const char *expr, const char *file, long int line, cha
 #define NotImplemented assert(!"Not Implemented")
 #define InvalidPath assert(!"Invalid Path")
 
+//
+// Variadic Macros
+//
+
+#define NameConcat2(A, B) A##B
+#define NameConcat(A, B) NameConcat2(A, B)
+
+#define ArgCount(...) _COUNTOF_CAT( _COUNTOF_A, ( 0, ##__VA_ARGS__, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0 ) )
+#define _COUNTOF_CAT( a, b ) a b
+#define _COUNTOF_A( a0, a1, a2, a3, a4, a5, a6, a7, a8, a9, n, ... ) n
+
+//
+// NOTE(nick): you have to define the functions in reverse order, as in:
+// #define Dump(...) ArgSelectHelper4((__VA_ARGS__, Dump4, Dump3, Dump2, Dump1))(__VA_ARGS__)
+//
+
+#define ArgSelectHelper4_(_1, _2, _3, _4, NAME, ...) NAME
+#define ArgSelectHelper4(args) ArgSelectHelper4_ args
+
+#define ArgSelectHelper2_(_1, _2, NAME, ...) NAME
+#define ArgSelectHelper2(args) ArgSelectHelper2_ args
+
 #endif // BASE_TYPES_H
 #ifndef BASE_MEMORY_H
 #define BASE_MEMORY_H
@@ -745,9 +770,9 @@ function Allocator arena_allocator(Arena *arena);
 #define Str(x) #x
 
 #if LANG_CPP
-    #define S(x) String{(u8 *)(x), sizeof(x)-1}
+    #define S(x) (String{(u8 *)(x), sizeof(x)-1})
 #else
-    #define S(x) (String){(u8 *)(x), sizeof(x)-1}
+    #define S(x) ((String){(u8 *)(x), sizeof(x)-1})
 #endif
 
 #if 0
@@ -871,10 +896,12 @@ function b32 char_is_digit(u8 c);
 function b32 char_is_space(u8 c);
 function b32 char_is_whitespace(u8 c);
 function b32 char_is_symbol(u8 c);
+function b32 char_is_separator(u8 c);
+function b32 char_is_slash(u8 c);
+
 function u8 char_to_upper(u8 c);
 function u8 char_to_lower(u8 c);
 function u8 char_to_forward_slash(u8 c);
-function b32 char_is_separator(u8 c);
 
 // C-Style Strings
 function i64 cstr_length(const char *cstr);
@@ -994,32 +1021,42 @@ function String string_upper(Arena *arena, String str);
 
 // Path Helpers
 function String path_filename(String path);
-function String path_basename(String path);
+function String path_dirname(String path);
 function String path_extension(String path);
 function String path_strip_extension(String path);
 
 function String path_join2(Arena *arena, String a, String b);
 function String path_join3(Arena *arena, String a, String b, String c);
 function String path_join4(Arena *arena, String a, String b, String c, String d);
-#define path_join(a, b) path_join2(temp_arena(), a, b)
+// #define path_join(a, b) path_join2(temp_arena(), a, b)
+#define path_join(...) ArgSelectHelper4((__VA_ARGS__, path_join4, path_join3, path_join2, path_join1))(temp_arena(), __VA_ARGS__)
 
 function b32 path_is_absolute(String path);
 
 // Timing
 function String string_from_time(f64 time_in_seconds, String_Time_Options options);
 
-
+// Dump
 #if DEBUG
-#if LANG_CPP
-    #define Dump(x) print("%s = %S\n", #x, to_string(x))
-    #define Dump2(x, y) print("%s = %S, %s = %S\n", #x, to_string(x), #y, to_string(y))
+    #define Dump(...) ArgSelectHelper4((__VA_ARGS__, Dump4, Dump3, Dump2, Dump1))(__VA_ARGS__)
+
+    #if LANG_CPP
+        #define Dump1(x) print("%s = %S\n", #x, to_string(x))
+        #define Dump2(x, y) print("%s = %S, %s = %S\n", #x, to_string(x), #y, to_string(y))
+        #define Dump3(x, y, z) print("%s = %S, %s = %S, %s = %S\n", #x, to_string(x), #y, to_string(y), #z, to_string(z))
+        #define Dump4(x, y, z, w) print("%s = %S, %s = %S, %s = %S, %s = %S\n", #x, to_string(x), #y, to_string(y), #z, to_string(z), #w, to_string(w))
+    #else
+        #define Dump1(x)
+        #define Dump2(x, y)
+        #define Dump3(x, y, z)
+        #define Dump4(x, y, z, w)
+    #endif
 #else
-    #define Dump(x)
+    #define Dump(...)
+    #define Dump1(x)
     #define Dump2(x, y)
-#endif
-#else
-    #define Dump(x)
-    #define Dump2(x, y)
+    #define Dump3(x, y, z)
+    #define Dump4(x, y, z, w)
 #endif
 
 #endif // BASE_STRINGS_H
@@ -1423,7 +1460,6 @@ function void work_queue_add_entry(Work_Queue *queue, Worker_Proc *callback, voi
 // Platform-Specific Headers:
 //
 
-#ifdef impl
 #if OS_WINDOWS
     #pragma push_macro("function")
 #pragma push_macro("Free")
@@ -1441,7 +1477,6 @@ function void work_queue_add_entry(Work_Queue *queue, Worker_Proc *callback, voi
 #else
     #error OS layer not implemented.
 #endif
-#endif
 
 #endif // OS_H
 
@@ -1449,9 +1484,8 @@ function void work_queue_add_entry(Work_Queue *queue, Worker_Proc *callback, voi
 // impl:
 //
 
+#ifdef impl
 
-// TODO(nick): track all allocations in the app!
-static Arena *g_arenas_in_use[2048] = {0};
 
 //
 // Memory
@@ -2154,6 +2188,11 @@ function b32 char_is_symbol(u8 c)
 function b32 char_is_separator(u8 c)
 {
     return char_is_space(c) || char_is_symbol(c);
+}
+
+function b32 char_is_slash(u8 c)
+{
+    return c == '\\' || c == '/';
 }
 
 function u8 char_to_upper(u8 c) {
@@ -3461,9 +3500,31 @@ function String path_filename(String path)
     return string_skip_last_slash(path);
 }
 
-function String path_basename(String path)
+function String path_dirname(String in_path)
 {
-    return string_chop_last_slash(path);
+    String path = in_path;
+    if (path.count > 0 && char_is_slash(path.data[path.count - 1]))
+    {
+        path.count -= 1;
+        while (path.count > 0 && char_is_slash(path.data[path.count - 1]))
+        {
+            path.count -= 1;
+        }
+    }
+
+    String result = string_chop_last_slash(path);
+    if (!result.count)
+    {
+        if (path_is_absolute(in_path))
+        {
+            result = S("/");
+        }
+        else
+        {
+            result = S(".");
+        }
+    }
+    return result;
 }
 
 function String path_extension(String path)
@@ -5066,19 +5127,19 @@ function u32 os_thread_await(Thread thread) {
 // Data Structures
 //
 
-function Semaphore semaphore_create(u32 max_count) {
+function Semaphore os_semaphore_create(u32 max_count) {
     Semaphore result = {0};
     result.handle = CreateSemaphoreExA(NULL, 0, max_count, 0, 0, SEMAPHORE_ALL_ACCESS);
     assert(result.handle != NULL);
     return result;
 }
 
-function void semaphore_signal(Semaphore *sem) {
+function void os_semaphore_signal(Semaphore *sem) {
     BOOL ok = ReleaseSemaphore(sem->handle, 1, 0);
     // assert(ok);
 }
 
-function void semaphore_wait_for(Semaphore *sem, bool infinite) {
+function void os_semaphore_wait_for(Semaphore *sem, bool infinite) {
     DWORD res;
 
     if (infinite) {
@@ -5090,12 +5151,12 @@ function void semaphore_wait_for(Semaphore *sem, bool infinite) {
     assert(res != WAIT_FAILED);
 }
 
-function void semaphore_destroy(Semaphore *sem) {
+function void os_semaphore_destroy(Semaphore *sem) {
     CloseHandle(sem->handle);
     sem->handle = 0;
 }
 
-function Mutex mutex_create(u32 spin_count) {
+function Mutex os_mutex_create(u32 spin_count) {
     Mutex result = {0};
 
     // TODO(nick): this is only 40 bytes, should we just bake this into the Mutex itself?
@@ -5111,19 +5172,19 @@ function Mutex mutex_create(u32 spin_count) {
     return result;
 }
 
-function void mutex_aquire_lock(Mutex *mutex) {
+function void os_mutex_aquire_lock(Mutex *mutex) {
     EnterCriticalSection(cast(LPCRITICAL_SECTION)mutex->handle);
 }
 
-function bool mutex_try_aquire_lock(Mutex *mutex) {
+function bool os_mutex_try_aquire_lock(Mutex *mutex) {
     return TryEnterCriticalSection(cast(LPCRITICAL_SECTION)mutex->handle) != 0;
 }
 
-function void mutex_release_lock(Mutex *mutex) {
+function void os_mutex_release_lock(Mutex *mutex) {
     LeaveCriticalSection(cast(LPCRITICAL_SECTION)mutex->handle);
 }
 
-function void mutex_destroy(Mutex *mutex) {
+function void os_mutex_destroy(Mutex *mutex) {
     if (mutex->handle)
     {
         DeleteCriticalSection(cast(LPCRITICAL_SECTION)mutex->handle);
@@ -5487,7 +5548,7 @@ function void os_mutex_destroy(Mutex *mutex) {
     #error Not implemented
 #endif
 
-#if OS_WINDOWS || OS_MACOS
+#if OS_LINUX || OS_MACOS
     #include <stdlib.h>
 #include <dirent.h>
 #include <sys/stat.h>
@@ -6525,15 +6586,25 @@ function i64 array__find(Array_Basic_Ref it, void *key, Compare_Func cmp)
 }
 
 #if 0
-struct i32_Array
+struct Array_i32
 {
     Arena *arena;
-    ArrayStructBody(i32);
+    i32 *data;
+    i64 count;
+    i64 capacity;
+};
+
+struct Array_i64
+{
+    Arena *arena;
+    i64 *data;
+    i64 count;
+    i64 capacity;
 };
 
 function void array__test()
 {
-    i32_Array array = {0};
+    Array_i32 array = {0};
     array_push(&array, 42);
     array_push(&array, 23);
     array_push(&array, 0);
@@ -6555,7 +6626,7 @@ function void array__test()
 
     i32 key = 42;
     i64 index = array_find(&array, &key, compare_i32);
-    dump(index);
+    Dump(index);
 }
 #endif
 //
@@ -6911,5 +6982,7 @@ function b32 table_delete(Table_KV *it, i64 index)
     }
     return result;
 }
+
+#endif // impl
 
 #endif // NA_H

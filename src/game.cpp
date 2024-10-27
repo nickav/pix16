@@ -59,7 +59,7 @@ void GameInit()
     String data_path = os_get_executable_path();
     if (!os_file_exists(path_join(data_path, S("data"))))
     {
-        data_path = path_join(path_basename(data_path), S("data"));
+        data_path = path_join(path_dirname(data_path), S("data"));
     }
     g_state.data_path = string_copy(g_state.arena, data_path);
 }
@@ -237,7 +237,7 @@ Sound LoadSound(String path)
     return {};
 }
 
-Font FontMake(Image image, String alphabet, Vector2i monospaced_letter_size)
+Font FontMakeFromImage(Image image, String alphabet, Vector2i monospaced_letter_size)
 {
     Font result = {0};
 
@@ -250,9 +250,12 @@ Font FontMake(Image image, String alphabet, Vector2i monospaced_letter_size)
     null_glyph->size = v2i(monospaced_letter_size.x, 0);
     result.glyph_count += 1;
 
-    for (i32 index = 0; index < Min(alphabet.count, count_of(result.glyphs)); index += 1)
+    String32 unicode_alphabet = string32_from_string(temp_arena(), alphabet);
+    Dump(unicode_alphabet.count);
+
+    for (i32 index = 0; index < Min(unicode_alphabet.count, count_of(result.glyphs)); index += 1)
     {
-        u32 character = alphabet.data[index];
+        u32 character = unicode_alphabet.data[index];
 
         Font_Glyph *glyph = &result.glyphs[result.glyph_count];
         result.glyph_count += 1;
@@ -267,6 +270,42 @@ Font FontMake(Image image, String alphabet, Vector2i monospaced_letter_size)
             cursor.x = 0;
             cursor.y += monospaced_letter_size.y;
         }
+    }
+
+    return result;
+}
+
+Font LoadFont(String path, String alphabet, Vector2i monospaced_letter_size)
+{
+    Font result = {0};
+
+    u64 hash = murmur64(path.data, path.count);
+    Font_Asset *asset = (Font_Asset *)FindAssetByHash(&g_state.fonts, sizeof(Font_Asset), count_of(g_state.fonts), hash);
+
+    if (!asset)
+    {
+        asset = (Font_Asset *)FindFreeAsset(&g_state.fonts, sizeof(Font_Asset), count_of(g_state.fonts));
+
+        if (!asset)
+        {
+            print("[LoadFont] Used all %d slots available! Failed to load font: %.*s\n", count_of(g_state.fonts), LIT(path));
+        }
+    }
+
+    if (asset)
+    {
+        if (asset->info.hash == 0)
+        {
+            Image image = LoadImage(path);
+            if (image.size.x > 0 && image.size.y > 0)
+            {
+                asset->font = FontMakeFromImage(image, alphabet, monospaced_letter_size);
+                asset->info.name = path;
+                asset->info.hash = hash;
+            }
+        }
+
+        result = asset->font;
     }
 
     return result;
@@ -699,8 +738,8 @@ void DrawImageExt(Image image, Rectangle2 rect, Vector4 color, Rectangle2 uv)
             if (u < 0) u += 1;
             if (v < 0) v += 1;
 
-            i32 sample_x = (i32)(u * image.size.width) % image.size.width;
-            i32 sample_y = (i32)(v * image.size.height) % image.size.height;
+            i32 sample_x = round_i32(u * image.size.width) % image.size.width;
+            i32 sample_y = round_i32(v * image.size.height) % image.size.height;
 
             assert((sample_x >= 0 && sample_x < image.size.width) && (sample_y >= 0 && sample_y < image.size.height));
 
@@ -724,65 +763,6 @@ void DrawImageExt(Image image, Rectangle2 rect, Vector4 color, Rectangle2 uv)
         at += out->width - (in_x1 - in_x0);
     }
 }
-
-#if 0
-void DrawSpriteExt(Image src, Vector2 in_src_position, Vector2 in_src_size, Vector2 in_dest_position, Vector4 color)
-{
-    Vector2i src_position = v2i_from_v2(in_src_position);
-    Vector2i src_size = v2i_from_v2(in_src_size);
-    Vector2i dest_position = v2i_from_v2(in_dest_position);
-
-    if (src.size.width == 0 || src.size.height == 0) return;
-
-    src_size.x = Min(src_size.x, src.size.x);
-    src_size.y = Min(src_size.y, src.size.y);
-
-    assert(src_size.x + dest_position.x <= out->width);
-    assert(src_size.y + dest_position.y <= out->height);
-
-    if (src_size.x == 0 || src_size.y == 0) return;
-
-    u8 *in_data = (u8 *)src.pixels;
-    u32 in_pitch = sizeof(u32) * src.size.width;
-    u8 *in_line = in_data + (src_position.y * in_pitch) + (sizeof(u32) * src_position.x);
-
-    u8 *out_data = (u8 *)out->pixels;
-    u32 out_pitch = sizeof(u32) * out->width;
-    u8 *out_line = out_data + (dest_position.y * out_pitch) + (sizeof(u32) * dest_position.x);
-
-    u32 in_copy_size = sizeof(u32) * src_size.x;
-
-    b32 color_is_white = color.r == 1 && color.g == 1 && color.b == 1 && color.a == 1;
-
-    for (i32 y = 0; y < src_size.height; y += 1)
-    {
-        u32 *in_pixel = (u32 *)in_line;
-        u32 *out_pixel = (u32 *)out_line;
-
-        for (int x = 0; x < src_size.width; x += 1)
-        {
-            u32 sample_color = *in_pixel;
-            if ((sample_color & 0xff000000) != 0)
-            {
-                if (color_is_white)
-                {
-                    *out_pixel = sample_color;
-                }
-                else
-                {
-                    *out_pixel = u32_rgba_from_v4(v4_rgba_from_u32(sample_color) * color);
-                }
-            }
-
-            in_pixel += 1;
-            out_pixel += 1;
-        }
-
-        in_line += in_pitch;
-        out_line += out_pitch;
-    }
-}
-#endif
 
 Font_Glyph FontGetGlyph(Font font, u32 character)
 {

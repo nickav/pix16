@@ -116,8 +116,6 @@ void DrawLine(Vector2 p0, Vector2 p1, Vector4 color);
 void DrawImage(Image image, Vector2 pos);
 void DrawImageExt(Image image, Rectangle2 rect, Rectangle2 uv);
 
-void DrawSpriteExt(Image src, Vector2i src_position, Vector2i src_size, Vector2i dest_position);
-
 void DrawText(Font font, String text, Vector2 pos);
 void DrawTextExt(Font font, String text, Vector2 pos, Vector4 color);
 
@@ -143,6 +141,4 @@ f32 SoundGetTime(Sound sound);
 
 Image LoadImage(String path);
 Sound LoadSound(String path);
-Font LoadFont(String path);
-
-Font FontMake(Image image, String alphabet, Vector2i monospaced_letter_size);
+Font LoadFont(String path, String alphabet, Vector2i monospaced_letter_size);

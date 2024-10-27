@@ -94,6 +94,13 @@ void GameRender(Game_Input *input, Game_Output *out)
     }
 
     DrawLine(v2(out->width * 0.5, out->height * 0.5), input->mouse.position, v4_white);
+
+
+    // TODO(nick): investigate strin32 decoding bug with cents symbol: ￠
+    String font_chars = S(" ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789$ €£¥¤+-*/÷=%‰\"'#@&_(),.;:¿?¡!\\|{}<>[]§¶µ`^~©®™");
+    Font font_hellomyoldfriend = LoadFont(S("spr_font_hellomyoldfriend_12x12_by_lotovik_strip110.png"), font_chars, v2i(12, 12));
+
+    DrawText(font_hellomyoldfriend, S("Hello, Sailor!"), v2(0, 0));
 }
 
 void GameUpdateAndRender(Game_Input *input, Game_Output *out)
