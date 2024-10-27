@@ -48,6 +48,7 @@ struct Game_State
 static Game_State g_state = {0};
 static Game_Input *input = NULL;
 static Game_Output *out  = NULL;
+static Game_Input *prev_input = NULL;
 
 void GameInit()
 {
@@ -64,10 +65,11 @@ void GameInit()
     g_state.data_path = string_copy(g_state.arena, data_path);
 }
 
-void GameSetState(Game_Input *the_input, Game_Output *the_output)
+void GameSetState(Game_Input *the_input, Game_Output *the_output, Game_Input *the_prev_input)
 {
     input = the_input;
     out = the_output;
+    prev_input = the_prev_input;
 }
 
 //
@@ -308,6 +310,99 @@ Font LoadFont(String path, String alphabet, Vector2i monospaced_letter_size)
         result = asset->font;
     }
 
+    return result;
+}
+
+//
+// Controller API
+//
+
+b32 ControllerPressed(int index, Controller_Button button)
+{
+    b32 result = false;
+    if (index >= 0 && index < count_of(input->controllers))
+    {
+        if (button >= 0 && button < Button_COUNT)
+        {
+            b32 *prev_state = (b32 *)&prev_input->controllers[index];
+            b32 *state = (b32 *)&input->controllers[index];
+
+            result = !prev_state[button] && state[button];
+        }
+    }
+    return result;
+}
+
+b32 ControllerDown(int index, Controller_Button button)
+{
+    b32 result = false;
+    if (index >= 0 && index < count_of(input->controllers))
+    {
+        if (button >= 0 && button < Button_COUNT)
+        {
+            b32 *prev_state = (b32 *)&prev_input->controllers[index];
+            b32 *state = (b32 *)&input->controllers[index];
+
+            result = state[button];
+        }
+    }
+    return result;
+}
+
+b32 ControllerReleased(int index, Controller_Button button)
+{
+    b32 result = false;
+    if (index >= 0 && index < count_of(input->controllers))
+    {
+        if (button >= 0 && button < Button_COUNT)
+        {
+            b32 *prev_state = (b32 *)&prev_input->controllers[index];
+            b32 *state = (b32 *)&input->controllers[index];
+
+            result = prev_state[button] && !state[button];
+        }
+    }
+    return result;
+}
+
+Vector2 MousePosition()
+{
+    return input->mouse.position;
+}
+
+b32 MousePressed(Mouse_Button button)
+{
+    b32 result = false;
+    if (button >= 0 && button < Mouse_COUNT)
+    {
+        b32 *prev_state = (b32 *)&prev_input->mouse;
+        b32 *state = (b32 *)&input->mouse;
+        result = !prev_state[button] && state[button];
+    }
+    return result;
+}
+
+b32 MouseDown(Mouse_Button button)
+{
+    b32 result = false;
+    if (button >= 0 && button < Mouse_COUNT)
+    {
+        b32 *prev_state = (b32 *)&prev_input->mouse;
+        b32 *state = (b32 *)&input->mouse;
+        result = state[button];
+    }
+    return result;
+}
+
+b32 MouseReleased(Mouse_Button button)
+{
+    b32 result = false;
+    if (button >= 0 && button < Mouse_COUNT)
+    {
+        b32 *prev_state = (b32 *)&prev_input->mouse;
+        b32 *state = (b32 *)&input->mouse;
+        result = prev_state[button] && !state[button];
+    }
     return result;
 }
 

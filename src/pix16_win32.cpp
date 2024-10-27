@@ -608,6 +608,9 @@ int APIENTRY WinMain(HINSTANCE instance, HINSTANCE prev_inst, LPSTR argv, int ar
         arena_reset(temp_arena());
 
         static Game_Input input = {};
+        static Game_Input prev_input = {};
+
+        MemoryCopyStruct(&prev_input, &input);
         {
             input.arena = permanant_storage;
             input.dt = target_dt;
@@ -705,7 +708,7 @@ int APIENTRY WinMain(HINSTANCE instance, HINSTANCE prev_inst, LPSTR argv, int ar
 
         profiler__begin();
 
-        GameSetState(&input, &output);
+        GameSetState(&input, &output, &prev_input);
         GameUpdateAndRender(&input, &output);
 
         profiler__end();

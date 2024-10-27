@@ -61,7 +61,8 @@ void GameUpdate(Game_Input *input)
         player.position.y = out->height - 16;
     }
 
-    if (ctrl0->a)
+
+    if (ControllerPressed(0, Button_A) || MousePressed(Mouse_Left))
     {
         player.velocity.y = -120;
     }

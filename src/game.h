@@ -1,5 +1,27 @@
 #pragma once
 
+typedef u32 Controller_Button;
+enum {
+    Button_Up = 0,
+    Button_Down,
+    Button_Left,
+    Button_Right,
+
+    Button_A,
+    Button_B,
+    Button_Start,
+    Button_Back,
+
+    Button_COUNT,
+};
+
+typedef u32 Mouse_Button;
+enum {
+    Mouse_Left = 0,
+    Mouse_Right = 1,
+    Mouse_COUNT,
+};
+
 struct Controller
 {
     b32 up;
@@ -95,6 +117,19 @@ struct Font
 void GameInit();
 void GameSetState(Game_Input *input, Game_Output *out);
 void GameUpdateAndRender(Game_Input *input, Game_Output *out);
+
+//
+// Controller API
+//
+
+b32 ControllerPressed(int controller_index, Controller_Button button);
+b32 ControllerDown(int index, Controller_Button button);
+b32 ControllerReleased(int index, Controller_Button button);
+
+Vector2 MousePosition();
+b32 MousePressed(Mouse_Button button);
+b32 MouseReleased(Mouse_Button button);
+b32 MouseDown(Mouse_Button button);
 
 //
 // Drawing API

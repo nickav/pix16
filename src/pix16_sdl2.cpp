@@ -254,6 +254,9 @@ int main()
         }
 
         static Game_Input input = {};
+        static Game_Input prev_input = {};
+
+        MemoryCopyStruct(&prev_input, &input);
         {
             input.arena = permanant_storage;
             input.dt = dt;
@@ -378,7 +381,7 @@ int main()
         output.sample_count = UserSampleCount;
         output.samples = (i16 *)UserSamples;
 
-        GameSetState(&input, &output);
+        GameSetState(&input, &output, &prev_input);
         GameUpdateAndRender(&input, &output);
 
         SDL_UnlockTexture(texture);
