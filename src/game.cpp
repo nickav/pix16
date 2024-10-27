@@ -487,6 +487,26 @@ void DrawRectExt(Rectangle2 rect, Vector4 c0, Vector4 c1, Vector4 c2, Vector4 c3
     }
 }
 
+void DrawRectOutline(Rectangle2 rect, Vector4 color, int thickness)
+{
+    i32 in_x0 = Clamp((i32)rect.x0, 0, out->width);
+    i32 in_y0 = Clamp((i32)rect.y0, 0, out->height);
+    i32 in_x1 = Clamp((i32)rect.x1, 0, out->width);
+    i32 in_y1 = Clamp((i32)rect.y1, 0, out->height);
+
+    // top
+    DrawRect(r2_from_f32(in_x0, in_y0, in_x1, in_y0+thickness), color);
+
+    // bottom
+    DrawRect(r2_from_f32(in_x0, in_y1, in_x1, in_y1-thickness), color);
+
+    // left
+    DrawRect(r2_from_f32(in_x0, in_y0, in_x0+thickness, in_y1), color);
+
+    // right
+    DrawRect(r2_from_f32(in_x1, in_y0, in_x1-thickness, in_y1), color);
+}
+
 void DrawCircle(Vector2 pos, f32 radius, Vector4 color)
 {
     i32 in_x0 = Clamp((i32)pos.x - radius, 0, out->width);

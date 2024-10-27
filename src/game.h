@@ -105,6 +105,7 @@ u32 DrawGetPixel(Vector2 pos);
 
 void DrawRect(Rectangle2 rect, Vector4 color);
 void DrawRectExt(Rectangle2 rect, Vector4 c0, Vector4 c1, Vector4 c2, Vector4 c3);
+void DrawRectOutline(Rectangle2 rect, Vector4 color, int thickness);
 
 void DrawCircle(Vector2 pos, f32 radius, Vector4 color);
 
