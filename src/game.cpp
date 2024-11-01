@@ -253,7 +253,6 @@ Font FontMakeFromImage(Image image, String alphabet, Vector2i monospaced_letter_
     result.glyph_count += 1;
 
     String32 unicode_alphabet = string32_from_string(temp_arena(), alphabet);
-    Dump(unicode_alphabet.count);
 
     for (i32 index = 0; index < Min(unicode_alphabet.count, count_of(result.glyphs)); index += 1)
     {
