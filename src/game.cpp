@@ -239,13 +239,14 @@ Sound LoadSound(String path)
     return {};
 }
 
-Font FontMakeFromImage(Image image, String alphabet, Vector2i monospaced_letter_size)
+Font FontMakeFromImageMono(Image image, String alphabet, Vector2i monospaced_letter_size)
 {
     Font result = {0};
 
     Vector2i cursor = {0, 0};
 
     result.image = image;
+    result.glyphs = result.glyphs_data;
 
     Font_Glyph *null_glyph = &result.glyphs[0];
     null_glyph->character = 0;
@@ -254,7 +255,7 @@ Font FontMakeFromImage(Image image, String alphabet, Vector2i monospaced_letter_
 
     String32 unicode_alphabet = string32_from_string(temp_arena(), alphabet);
 
-    for (i32 index = 0; index < Min(unicode_alphabet.count, count_of(result.glyphs)); index += 1)
+    for (int index = 0; index < Min(unicode_alphabet.count, count_of(result.glyphs_data)); index += 1)
     {
         u32 character = unicode_alphabet.data[index];
 
@@ -264,6 +265,8 @@ Font FontMakeFromImage(Image image, String alphabet, Vector2i monospaced_letter_
         glyph->character = character;
         glyph->pos = cursor;
         glyph->size = monospaced_letter_size;
+        glyph->line_offset = v2i(0, 0);
+        glyph->xadvance = monospaced_letter_size.x;
 
         cursor.x += monospaced_letter_size.x;
         if (cursor.x >= image.size.width)
@@ -273,6 +276,15 @@ Font FontMakeFromImage(Image image, String alphabet, Vector2i monospaced_letter_
         }
     }
 
+    return result;
+}
+
+Font FontMake(Image image, Font_Glyph *glyphs, u64 glyph_count)
+{
+    Font result = {0};
+    result.image = image;
+    result.glyphs = glyphs;
+    result.glyph_count = glyph_count;
     return result;
 }
 
@@ -300,7 +312,7 @@ Font LoadFont(String path, String alphabet, Vector2i monospaced_letter_size)
             Image image = LoadImage(path);
             if (image.size.x > 0 && image.size.y > 0)
             {
-                asset->font = FontMakeFromImage(image, alphabet, monospaced_letter_size);
+                asset->font = FontMakeFromImageMono(image, alphabet, monospaced_letter_size);
                 asset->info.name = path;
                 asset->info.hash = hash;
             }
@@ -310,6 +322,12 @@ Font LoadFont(String path, String alphabet, Vector2i monospaced_letter_size)
     }
 
     return result;
+}
+
+Font LoadFontExt(String path, Font_Glyph *glyphs, u64 glyph_count)
+{
+    Image image = LoadImage(path);
+    return FontMake(image, glyphs, glyph_count);
 }
 
 //
@@ -921,12 +939,11 @@ void DrawTextExt(Font font, String text, Vector2 pos, Vector4 color)
         if (color.a > 0)
         {
             Vector2 pos = cursor;
-            //pos += glyph.line_offset;
+            pos += v2_from_v2i(glyph.line_offset);
             DrawImageExt(font.image, r2(pos, pos + v2_from_v2i(glyph.size)), color, uv);
         }
 
-        cursor.x += glyph.size.width;
-        //cursor.x += glyph.xadvance;
+        cursor.x += glyph.xadvance;
     }
 }
 

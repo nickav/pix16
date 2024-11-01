@@ -106,8 +106,10 @@ struct Font
 {
     Image image;
 
-    Font_Glyph glyphs[128];
+    Font_Glyph *glyphs;
     u32 glyph_count;
+
+    Font_Glyph glyphs_data[128];
 };
 
 //
@@ -115,7 +117,7 @@ struct Font
 //
 
 void GameInit();
-void GameSetState(Game_Input *input, Game_Output *out);
+void GameSetState(Game_Input *input, Game_Output *out, Game_Input *prev_input);
 void GameUpdateAndRender(Game_Input *input, Game_Output *out);
 
 //
@@ -179,3 +181,4 @@ f32 SoundGetTime(Sound sound);
 Image LoadImage(String path);
 Sound LoadSound(String path);
 Font LoadFont(String path, String alphabet, Vector2i monospaced_letter_size);
+Font LoadFontExt(String path, Font_Glyph *glyphs, u64 glyph_count);
