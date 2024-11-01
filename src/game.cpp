@@ -922,8 +922,10 @@ Font_Glyph FontGetGlyph(Font font, u32 character)
     return result;
 }
 
-void DrawTextExt(Font font, String text, Vector2 pos, Vector4 color)
+void DrawTextExt(Font font, String text, Vector2 pos, Vector4 color, f32 scale)
 {
+    if (scale <= 0) scale = 1.0;
+    
     Vector2 cursor = pos;
 
     for (i32 i = 0; i < text.count; i += 1)
@@ -939,17 +941,17 @@ void DrawTextExt(Font font, String text, Vector2 pos, Vector4 color)
         if (color.a > 0)
         {
             Vector2 pos = cursor;
-            pos += v2_from_v2i(glyph.line_offset);
-            DrawImageExt(font.image, r2(pos, pos + v2_from_v2i(glyph.size)), color, uv);
+            pos += v2_from_v2i(glyph.line_offset) * scale;
+            DrawImageExt(font.image, r2(pos, pos + v2_from_v2i(glyph.size) * scale), color, uv);
         }
 
-        cursor.x += glyph.xadvance;
+        cursor.x += glyph.xadvance * scale;
     }
 }
 
 void DrawText(Font font, String text, Vector2 pos)
 {
-    DrawTextExt(font, text, pos, v4_white);
+    DrawTextExt(font, text, pos, v4_white, 1);
 }
 
 void DrawClear(Vector4 color)
