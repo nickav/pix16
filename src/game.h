@@ -1,5 +1,15 @@
 #pragma once
 
+const Vector2 TextAlign_Center      = v2(0.5, 0.5);
+
+const Vector2 TextAlign_TopLeft     = v2(0, 0);
+const Vector2 TextAlign_BottomLeft  = v2(0, 1);
+const Vector2 TextAlign_CenterLeft  = v2(0, 0.5);
+
+const Vector2 TextAlign_TopRight    = v2(1, 0);
+const Vector2 TextAlign_BottomRight = v2(1, 1);
+const Vector2 TextAlign_CenterRight = v2(1, 0.5);
+
 typedef u32 Controller_Button;
 enum {
     Button_Up = 0,
@@ -108,8 +118,6 @@ struct Font
 
     Font_Glyph *glyphs;
     u32 glyph_count;
-
-    Font_Glyph glyphs_data[128];
 };
 
 //
@@ -155,8 +163,10 @@ void DrawImage(Image image, Vector2 pos);
 void DrawImageExt(Image image, Rectangle2 rect, Rectangle2 uv);
 void DrawImageMirrored(Image image, Vector2 pos, b32 flip_x, b32 flip_y);
 
+Vector2 MeasureText(Font font, String text);
 void DrawText(Font font, String text, Vector2 pos);
-void DrawTextExt(Font font, String text, Vector2 pos, Vector4 color, f32 scale);
+void DrawTextAlign(Font font, String text, Vector2 pos, Vector2 anchor);
+void DrawTextExt(Font font, String text, Vector2 pos, Vector4 color, Vector2 anchor, f32 scale);
 
 void DrawClear(Vector4 color);
 

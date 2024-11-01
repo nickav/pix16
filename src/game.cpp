@@ -245,17 +245,19 @@ Font FontMakeFromImageMono(Image image, String alphabet, Vector2i monospaced_let
 
     Vector2i cursor = {0, 0};
 
-    result.image = image;
-    result.glyphs = result.glyphs_data;
+    String32 unicode_alphabet = string32_from_string(temp_arena(), alphabet);
+    u32 glyph_count = unicode_alphabet.count;
+
+    result.image  = image;
+    result.glyphs = PushArrayZero(g_state.arena, Font_Glyph, glyph_count+1);
+    result.glyph_count = 0;
 
     Font_Glyph *null_glyph = &result.glyphs[0];
     null_glyph->character = 0;
     null_glyph->size = v2i(monospaced_letter_size.x, 0);
     result.glyph_count += 1;
 
-    String32 unicode_alphabet = string32_from_string(temp_arena(), alphabet);
-
-    for (int index = 0; index < Min(unicode_alphabet.count, count_of(result.glyphs_data)); index += 1)
+    for (int index = 0; index < glyph_count; index += 1)
     {
         u32 character = unicode_alphabet.data[index];
 
@@ -909,7 +911,7 @@ Font_Glyph FontGetGlyph(Font font, u32 character)
 {
     Font_Glyph result = font.glyphs[0];
 
-    for (i32 index = 1; index < font.glyph_count; index += 1)
+    for (int index = 1; index < font.glyph_count; index += 1)
     {
         Font_Glyph *it = &font.glyphs[index];
         if (it->character == character)
@@ -922,15 +924,41 @@ Font_Glyph FontGetGlyph(Font font, u32 character)
     return result;
 }
 
-void DrawTextExt(Font font, String text, Vector2 pos, Vector4 color, f32 scale)
+
+Vector2 MeasureText(Font font, String text)
+{
+    Vector2 result = {0};
+
+    f32 line_height = 0;
+
+    String32 unicode_text = string32_from_string(temp_arena(), text);
+    for (i32 i = 0; i < unicode_text.count; i += 1)
+    {
+        u32 character = unicode_text.data[i];
+        Font_Glyph glyph = FontGetGlyph(font, character);
+
+        result.x += glyph.xadvance;
+        result.y = Max(result.y, glyph.size.y);
+    }
+
+    return result;
+}
+
+void DrawTextExt(Font font, String text, Vector2 pos, Vector4 color, Vector2 anchor, f32 scale)
 {
     if (scale <= 0) scale = 1.0;
     
     Vector2 cursor = pos;
-
-    for (i32 i = 0; i < text.count; i += 1)
+    if (!v2_is_zero(anchor))
     {
-        u32 character = (u32)text.data[i];
+        Vector2 size = MeasureText(font, text);
+        cursor -= size * anchor * scale;
+    }
+
+    String32 unicode_text = string32_from_string(temp_arena(), text);
+    for (i32 i = 0; i < unicode_text.count; i += 1)
+    {
+        u32 character = unicode_text.data[i];
         Font_Glyph glyph = FontGetGlyph(font, character);
 
         Rectangle2 uv = r2(
@@ -951,12 +979,17 @@ void DrawTextExt(Font font, String text, Vector2 pos, Vector4 color, f32 scale)
 
 void DrawText(Font font, String text, Vector2 pos)
 {
-    DrawTextExt(font, text, pos, v4_white, 1);
+    DrawTextExt(font, text, pos, v4_white, v2_zero, 1);
+}
+
+void DrawTextAlign(Font font, String text, Vector2 pos, Vector2 anchor)
+{
+    DrawTextExt(font, text, pos, v4_white, anchor, 1);
 }
 
 void DrawClear(Vector4 color)
 {
-    DrawRect( r2(v2(0, 0), v2(out->width, out->height)), color);
+    DrawRect(r2(v2(0, 0), v2(out->width, out->height)), color);
 }
 
 //

@@ -101,7 +101,9 @@ void GameRender(Game_Input *input, Game_Output *out)
     String font_chars = S(" ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789$ €£¥¤+-*/÷=%‰\"'#@&_(),.;:¿?¡!\\|{}<>[]§¶µ`^~©®™");
     Font font_hellomyoldfriend = LoadFont(S("spr_font_hellomyoldfriend_12x12_by_lotovik_strip110.png"), font_chars, v2i(12, 12));
 
-    DrawText(font_hellomyoldfriend, S("Hello, Sailor!"), v2(0, 0));
+    // Vector2 size = MeasureText(font_hellomyoldfriend, S("Hello, Sailor!"));
+    // DrawText(font_hellomyoldfriend, S("Hello, Sailor!"), v2(game_width * 0.5, game_height * 0.5) - size * 0.5);
+    DrawTextAlign(font_hellomyoldfriend, S("Hello, Sailor!"), v2(game_width * 0.5, game_height * 0.5), TextAlign_Center);
 }
 
 void GameUpdateAndRender(Game_Input *input, Game_Output *out)
