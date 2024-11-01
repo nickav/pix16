@@ -151,6 +151,7 @@ void DrawLine(Vector2 p0, Vector2 p1, Vector4 color);
 
 void DrawImage(Image image, Vector2 pos);
 void DrawImageExt(Image image, Rectangle2 rect, Rectangle2 uv);
+void DrawImageMirrored(Image image, Vector2 pos, b32 flip_x, b32 flip_y);
 
 void DrawText(Font font, String text, Vector2 pos);
 void DrawTextExt(Font font, String text, Vector2 pos, Vector4 color);

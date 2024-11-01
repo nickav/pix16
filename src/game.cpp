@@ -879,6 +879,15 @@ void DrawImageExt(Image image, Rectangle2 rect, Vector4 color, Rectangle2 uv)
     }
 }
 
+void DrawImageMirrored(Image image, Vector2 pos, b32 flip_x, b32 flip_y)
+{
+    Rectangle2 dest = r2(pos, pos + v2_from_v2i(image.size));
+    Rectangle2 uv = r2_from_f32(0, 0, 1, 1);
+    if (flip_x) { uv.x0 = 1; uv.x1 = 0; }
+    if (flip_y) { uv.y0 = 1; uv.y1 = 0; }
+    DrawImageExt(image, dest, v4_white, uv);
+}
+
 Font_Glyph FontGetGlyph(Font font, u32 character)
 {
     Font_Glyph result = font.glyphs[0];
