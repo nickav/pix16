@@ -41,7 +41,7 @@ static i32 game_width = 320;
 static i32 game_height = 240;
 static b32 game_pixel_perfect = true;
 
-#define PROFILER 1
+#define PROFILER 0
 #include "profiler.cpp"
 
 #include "game.h"
@@ -712,6 +712,7 @@ int APIENTRY WinMain(HINSTANCE instance, HINSTANCE prev_inst, LPSTR argv, int ar
         GameUpdateAndRender(&input, &output);
 
         profiler__end();
+        profiler__print();
 
         output.samples_played += UserSampleCount;
 

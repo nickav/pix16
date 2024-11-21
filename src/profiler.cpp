@@ -5,35 +5,40 @@
 // TODO(nick): support other platforms
 function f64 ReadOSTimer()
 {
-    static u64 win32_ticks_per_second = 0;
-    static u64 win32_counter_offset = 0;
+    #if __MAC_OS_X_VERSION_MIN_REQUIRED >= 101200
 
-    if (win32_ticks_per_second == 0)
+        #ifndef CLOCK_MONOTONIC_RAW
+            #error "CLOCK_MONOTONIC_RAW not found. Please verify that <time.h> is included from the MacOSX SDK rather than /usr/local/include"
+        #endif
+
+        static f64 macos_initial_clock = 0;
+        if (!macos_initial_clock)
+        {
+            macos_initial_clock = clock_gettime_nsec_np(CLOCK_MONOTONIC_RAW);
+        }
+
+        return (f64)(clock_gettime_nsec_np(CLOCK_MONOTONIC_RAW) - macos_initial_clock) / (f64)(1e9);
+    #else
+
+    static f64 macos_perf_frequency = 0;
+    static f64 macos_perf_counter = 0;
+
+    if (macos_perf_frequency == 0)
     {
-        LARGE_INTEGER perf_frequency = {};
-        if (QueryPerformanceFrequency(&perf_frequency)) {
-            win32_ticks_per_second = perf_frequency.QuadPart;
-        }
-        LARGE_INTEGER perf_counter = {};
-        if (QueryPerformanceCounter(&perf_counter)) {
-            win32_counter_offset = perf_counter.QuadPart;
-        }
+        mach_timebase_info_data_t rate_nsec;
+        mach_timebase_info(&rate_nsec);
 
-        assert(win32_ticks_per_second != 0);
+        macos_perf_frequency = 1000000000LL * rate_nsec.numer / rate_nsec.denom;
+        macos_perf_counter = mach_absolute_time();
     }
 
-    f64 result = 0;
+    f64 now = mach_absolute_time();
+    return (now - macos_perf_counter) / macos_perf_frequency;
 
-    LARGE_INTEGER perf_counter;
-    if (QueryPerformanceCounter(&perf_counter)) {
-        perf_counter.QuadPart -= win32_counter_offset;
-        result = (f64)(perf_counter.QuadPart) / win32_ticks_per_second;
-    }
-
-    return result;
+    #endif
 }
 
-force_inline u64 ReadCPUTimer(void)
+function u64 ReadCPUTimer(void)
 {
     #if defined(COMPILER_MSVC) && !defined(__clang__)
         return __rdtsc();
@@ -45,6 +50,10 @@ force_inline u64 ReadCPUTimer(void)
         u32 hi, lo;
         __asm__ __volatile__ ("rdtsc" : "=a"(lo), "=d"(hi));
         return (cast(u64)lo) | ((cast(u64)hi)<<32);
+    #elif defined(__arm64__)
+        u64 x;
+        __asm__ volatile("mrs \t%0, cntvct_el0" : "=r"(x));
+        return x;
     #else
         #error "[ReadCPUTimer] Unsupported OS/compiler!"
     #endif
@@ -135,25 +144,46 @@ function u64 profiler__estimate_clocks_per_second()
     return ClocksPerSecond;
 }
 
+function f64 profiler__seconds_from_clocks(u64 clocks)
+{
+    f64 result = 0;
+
+    u64 cpu_freq = g_profiler.cpu_freq;
+    if (cpu_freq != 0)
+    {
+        result = (f64)clocks / (f64)cpu_freq;
+    }
+
+    return result;
+}
+
 function void profiler__print_time_elapsed(Profile_Anchor *anchor, u64 TotalTSCElapsed)
 {
     f64 Percent = 100.0 * ((f64)anchor->tsc_elapsed_exclusive / (f64)TotalTSCElapsed);
-    print("  %s[%llu]: %llu (%.2f%%", anchor->label, anchor->hit_count, anchor->tsc_elapsed_exclusive, Percent);
+    f64 Time    = 1000.0 * profiler__seconds_from_clocks(anchor->tsc_elapsed_exclusive);
+    print("  %s[%llu]: %llu|%.2fms (%.2f%%", anchor->label, anchor->hit_count, anchor->tsc_elapsed_exclusive, Time, Percent);
     if(anchor->tsc_elapsed_inclusive != anchor->tsc_elapsed_exclusive)
     {
         f64 PercentWithChildren = 100.0 * ((f64)anchor->tsc_elapsed_inclusive / (f64)TotalTSCElapsed);
-        print(", %.2f%% w/children", PercentWithChildren);
+        f64 TimeWithChildren    = 1000.0 * profiler__seconds_from_clocks(anchor->tsc_elapsed_inclusive);
+        print(", %.2fms|%.2f%% w/children", TimeWithChildren, PercentWithChildren);
     }
     print(")\n");
 }
 
 function void profiler__init()
 {
+    static b32 initted = false;
+    if (initted) return;
+    initted = true;
+
     g_profiler.cpu_freq = profiler__estimate_clocks_per_second();
 }
 
 function void profiler__begin()
 {
+    profiler__init();
+
     if (!g_profiler.cpu_freq)
     {
         g_profiler.cpu_freq = profiler__estimate_clocks_per_second();

@@ -35,6 +35,9 @@ static i32 game_width = 320;
 static i32 game_height = 240;
 static b32 game_pixel_perfect = true;
 
+#define PROFILER 0
+#include "profiler.cpp"
+
 #include "game.h"
 #include "game.cpp"
 
@@ -381,8 +384,13 @@ int main()
         output.sample_count = UserSampleCount;
         output.samples = (i16 *)UserSamples;
 
+        profiler__begin();
+
         GameSetState(&input, &output, &prev_input);
         GameUpdateAndRender(&input, &output);
+
+        profiler__end();
+        profiler__print();
 
         SDL_UnlockTexture(texture);
 
