@@ -23,14 +23,26 @@ struct Sound_Asset
 {
     Asset_Info info;
     Sound sound;
-
-    u32 sample_offset;
 };
 
 struct Font_Asset
 {
     Asset_Info info;
     Font font;
+};
+
+struct Playing_Sound
+{
+    Sound sound;
+    f32 volume;
+    u32 sample_offset;
+};
+
+struct Playing_Sounds
+{
+    Playing_Sound *data;
+    u64 capacity;
+    u64 count;
 };
 
 struct Game_State
@@ -43,6 +55,10 @@ struct Game_State
 
     Arena *arena;
     String data_path;
+
+    // Mixer
+    Playing_Sounds playing_sounds;
+    f32 master_volume;
 };
 
 static Game_State g_state = {0};
@@ -52,17 +68,25 @@ static Game_Input *prev_input = NULL;
 
 void GameInit()
 {
+    Arena *arena = arena_alloc(Gigabytes(1));
+
     MemoryZero(&g_state, sizeof(Game_State));
     g_state.rng = {0x6908243098231};
 
-    g_state.arena = arena_alloc(Gigabytes(1));
+    g_state.arena = arena;
 
     String data_path = os_get_executable_path();
     if (!os_file_exists(path_join(data_path, S("data"))))
     {
         data_path = path_join(path_dirname(data_path), S("data"));
     }
-    g_state.data_path = string_copy(g_state.arena, data_path);
+    g_state.data_path = string_copy(arena, data_path);
+
+    g_state.playing_sounds.capacity = 256;
+    g_state.playing_sounds.count = 0;
+    g_state.playing_sounds.data = PushArrayZero(arena, Playing_Sound, g_state.playing_sounds.capacity);
+    
+    g_state.master_volume = 1.0;
 }
 
 void GameSetState(Game_Input *the_input, Game_Output *the_output, Game_Input *the_prev_input)
@@ -999,12 +1023,12 @@ void DrawClear(Vector4 color)
 #define MAX_CONCURRENT_SOUNDS ((f32)8)
 #define MAX_SOUND_SIZE (I16_MAX * (1.0 / MAX_CONCURRENT_SOUNDS))
 
-void PlaySine(f32 tone_hz, f32 volume)
+void PlaySine(f32 tone_hz, u32 sample_offset, f32 volume)
 {
     volume = clamp_f32(volume, 0, 2);
 
     int wave_period = out->samples_per_second / tone_hz;
-    f32 t_sine = out->samples_played * TAU / (f32)wave_period;
+    f32 t_sine = sample_offset * TAU / (f32)wave_period;
     t_sine = Mod(t_sine, TAU);
 
     i16 *sample_out = out->samples;
@@ -1022,12 +1046,12 @@ void PlaySine(f32 tone_hz, f32 volume)
     }
 }
 
-void PlaySquare(f32 tone_hz, f32 volume)
+void PlaySquare(f32 tone_hz, u32 sample_offset, f32 volume)
 {
     volume = clamp_f32(volume, 0, 2);
 
     f32 wave_period = (f32)out->samples_per_second / tone_hz;
-    f32 t_sine = out->samples_played * TAU / wave_period;
+    f32 t_sine = sample_offset * TAU / wave_period;
     t_sine = Mod(t_sine, TAU);
 
     i16 *sample_out = out->samples;
@@ -1045,12 +1069,12 @@ void PlaySquare(f32 tone_hz, f32 volume)
     }
 }
 
-void PlayTriangle(f32 tone_hz, f32 volume)
+void PlayTriangle(f32 tone_hz, u32 sample_offset, f32 volume)
 {
     volume = clamp_f32(volume, 0, 2);
 
     f32 wave_period = (f32)out->samples_per_second / tone_hz;
-    f32 t_sine = out->samples_played * TAU / (f32)wave_period;
+    f32 t_sine = sample_offset * TAU / (f32)wave_period;
     t_sine = Mod(t_sine, TAU);
 
     i16 *sample_out = out->samples;
@@ -1069,12 +1093,12 @@ void PlayTriangle(f32 tone_hz, f32 volume)
     }
 }
 
-void PlaySawtooth(f32 tone_hz, f32 volume)
+void PlaySawtooth(f32 tone_hz, u32 sample_offset, f32 volume)
 {
     volume = clamp_f32(volume, 0, 2);
 
     f32 wave_period = (f32)out->samples_per_second / tone_hz;
-    f32 t_sine = out->samples_played * TAU / (f32)wave_period;
+    f32 t_sine = sample_offset * TAU / (f32)wave_period;
     t_sine = Mod(t_sine, TAU);
 
     i16 *sample_out = out->samples;
@@ -1101,25 +1125,25 @@ void PlayNoise(f32 volume)
     i16 *sample_out = out->samples;
     for (int sample_index = 0; sample_index < out->sample_count; sample_index++)
     {
-        f32 random_value   = random_pcg_f32_between(rng, -1.0, 1.0);
+        f32 random_value = random_pcg_f32_between(rng, -1.0, 1.0);
         i16 sample_value = (i16)(random_value * volume * MAX_SOUND_SIZE);
         *sample_out++ += sample_value;
         *sample_out++ += sample_value;
     }
 }
 
-void PlaySoundStream(Sound sound, f32 volume)
+u32 PlaySoundStream(Sound sound, u32 sample_offset, f32 volume)
 {
     Sound_Asset *asset = (Sound_Asset *)GetAssetByIndex(&g_state.sounds, sizeof(Sound_Asset), count_of(g_state.sounds), sound.index); 
-    if (!asset) return;
+    if (!asset) return 0;
 
     volume = clamp_f32(volume, 0, 2);
 
     i16 *samples = out->samples;
 
-    i16 *at = (i16 *)((u8 *)sound.samples + asset->sample_offset * sizeof(i16) * 2);
+    i16 *at = (i16 *)((u8 *)sound.samples + sample_offset * sizeof(i16) * 2);
 
-    u32 samples_remaining = sound.total_samples - asset->sample_offset;
+    u32 samples_remaining = sound.total_samples - sample_offset;
 
     u32 sample_count = Min(out->sample_count, samples_remaining);
 
@@ -1132,26 +1156,40 @@ void PlaySoundStream(Sound sound, f32 volume)
         at += 1;
     }
 
-    asset->sample_offset += sample_count;
+    return sample_count;
 }
 
-f32 SoundGetTime(Sound sound)
+void MixerPlaySound(Sound sound, f32 volume)
 {
-    Sound_Asset *asset = (Sound_Asset *)GetAssetByIndex(&g_state.sounds, sizeof(Sound_Asset), count_of(g_state.sounds), sound.index); 
-    if (!asset) return 0;
+    Playing_Sound play = {0};
+    play.sound = sound;
+    play.volume = volume;
 
-    assert(out->samples_per_second > 0);
-
-    u32 sample_offset = clamp_u32(asset->sample_offset, 0, sound.total_samples);
-    f32 result = sample_offset / (f32)out->samples_per_second;
-    return result;
+    if (g_state.playing_sounds.count < g_state.playing_sounds.capacity)
+    {
+        array_add(&g_state.playing_sounds, play);
+    }
 }
 
-void SoundSeek(Sound sound, f32 time_in_seconds)
+void MixerSetMasterVolume(f32 master_volume)
 {
-    Sound_Asset *asset = (Sound_Asset *)GetAssetByIndex(&g_state.sounds, sizeof(Sound_Asset), count_of(g_state.sounds), sound.index); 
-    if (!asset) return;
+    g_state.master_volume = Clamp(master_volume, 0.0, 1.0);
+}
 
-    u32 sample_offset = out->samples_per_second * Max(time_in_seconds, 0);
-    asset->sample_offset = clamp_u32(sample_offset, 0, sound.total_samples);
+void MixerOutputPlayingSounds()
+{
+    Playing_Sounds *sounds = &g_state.playing_sounds;
+
+    f32 master_volume = g_state.master_volume;
+
+    for (i64 index = sounds->count - 1; index >= 0; index -= 1)
+    {
+        Playing_Sound *sound = &sounds->data[index];
+        sound->sample_offset += PlaySoundStream(sound->sound, sound->sample_offset, master_volume * sound->volume);
+
+        if (sound->sample_offset >= sound->sound.total_samples)
+        {
+            array_remove_ordered(sounds, index);
+        }
+    }
 }

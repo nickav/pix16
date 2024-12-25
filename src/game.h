@@ -174,15 +174,17 @@ void DrawClear(Vector4 color);
 // Sound API
 //
 
-void PlaySine(f32 tone_hz, f32 volume);
-void PlaySquare(f32 tone_hz, f32 volume);
-void PlayTriangle(f32 tone_hz, f32 volume);
-void PlaySawtooth(f32 tone_hz, f32 volume);
+void PlaySine(f32 tone_hz, u32 sample_offset, f32 volume);
+void PlaySquare(f32 tone_hz, u32 sample_offset, f32 volume);
+void PlayTriangle(f32 tone_hz, u32 sample_offset, f32 volume);
+void PlaySawtooth(f32 tone_hz, u32 sample_offset, f32 volume);
 void PlayNoise(f32 volume);
 
-void PlaySoundStream(Sound sound, f32 volume);
-void SoundSeek(Sound sound, f32 time_in_seconds);
-f32 SoundGetTime(Sound sound);
+u32  PlaySoundStream(Sound sound, u32 sample_offset, f32 volume);
+
+void MixerPlaySound(Sound sound, f32 volume);
+void MixerSetMasterVolume(f32 master_volume);
+void MixerOutputPlayingSounds();
 
 //
 // Assets API
