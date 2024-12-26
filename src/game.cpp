@@ -38,7 +38,7 @@ struct Playing_Sound
     u32 sample_offset;
 };
 
-struct Playing_Sounds
+struct Playing_Sound_Array
 {
     Playing_Sound *data;
     u64 capacity;
@@ -57,7 +57,7 @@ struct Game_State
     String data_path;
 
     // Mixer
-    Playing_Sounds playing_sounds;
+    Playing_Sound_Array playing_sounds;
     f32 master_volume;
 };
 
@@ -85,7 +85,7 @@ void GameInit()
     g_state.playing_sounds.capacity = 256;
     g_state.playing_sounds.count = 0;
     g_state.playing_sounds.data = PushArrayZero(arena, Playing_Sound, g_state.playing_sounds.capacity);
-    
+
     g_state.master_volume = 1.0;
 }
 
@@ -158,7 +158,7 @@ Asset_Info *GetAssetByIndex(void *array, u64 size, u64 count, i64 index)
 
 Image LoadImage(String path)
 {
-    u64 hash = murmur64(path.data, path.count);
+    u64 hash = fnv64a(path.data, path.count);
 
     Image_Asset *result = (Image_Asset *)FindAssetByHash(&g_state.images, sizeof(Image_Asset), count_of(g_state.images), hash);
 
@@ -886,8 +886,8 @@ void DrawImageExt(Image image, Rectangle2 rect, Vector4 color, Rectangle2 uv)
     {
         for (i32 x = in_x0; x < in_x1; x += 1)
         {
-            f32 u = (x - in_x0 + src_pos_x) / (f32)(width);
-            f32 v = (y - in_y0 + src_pos_y) / (f32)(height);
+            f32 u = ((x - in_x0 + src_pos_x) + 0.5) / (f32)(width);
+            f32 v = ((y - in_y0 + src_pos_y) + 0.5) / (f32)(height);
 
             // remap to input uv range
             u = uv.x0 + u * (uv.x1 - uv.x0);
@@ -895,9 +895,13 @@ void DrawImageExt(Image image, Rectangle2 rect, Vector4 color, Rectangle2 uv)
 
             if (u < 0) u += 1;
             if (v < 0) v += 1;
+            if (u > 1) u -= 1;
+            if (v > 1) v -= 1;
 
-            i32 sample_x = round_i32(u * image.size.width) % image.size.width;
-            i32 sample_y = round_i32(v * image.size.height) % image.size.height;
+            i32 sample_x = floor_i32(u * (image.size.width)) % image.size.width;
+            i32 sample_y = floor_i32(v * (image.size.height)) % image.size.height;
+            sample_x = Max(sample_x, 0);
+            sample_y = Max(sample_y, 0);
 
             assert((sample_x >= 0 && sample_x < image.size.width) && (sample_y >= 0 && sample_y < image.size.height));
 
@@ -1178,7 +1182,7 @@ void MixerSetMasterVolume(f32 master_volume)
 
 void MixerOutputPlayingSounds()
 {
-    Playing_Sounds *sounds = &g_state.playing_sounds;
+    Playing_Sound_Array *sounds = &g_state.playing_sounds;
 
     f32 master_volume = g_state.master_volume;
 
