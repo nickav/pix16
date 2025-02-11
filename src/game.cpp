@@ -41,8 +41,8 @@ struct Playing_Sound
 struct Playing_Sound_Array
 {
     Playing_Sound *data;
-    u64 capacity;
-    u64 count;
+    i64 capacity;
+    i64 count;
 };
 
 struct Game_State
@@ -80,7 +80,7 @@ void GameInit()
     {
         data_path = path_join(path_dirname(data_path), S("data"));
     }
-    g_state.data_path = string_copy(arena, data_path);
+    g_state.data_path = string_push(arena, data_path);
 
     g_state.playing_sounds.capacity = 256;
     g_state.playing_sounds.count = 0;
@@ -1129,7 +1129,7 @@ void PlayNoise(f32 volume)
     i16 *sample_out = out->samples;
     for (int sample_index = 0; sample_index < out->sample_count; sample_index++)
     {
-        f32 random_value = random_pcg_f32_between(rng, -1.0, 1.0);
+        f32 random_value = random_pcg_between_f32(rng, -1.0, 1.0);
         i16 sample_value = (i16)(random_value * volume * MAX_SOUND_SIZE);
         *sample_out++ += sample_value;
         *sample_out++ += sample_value;
