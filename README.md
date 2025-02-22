@@ -4,7 +4,7 @@ A fantasy console written in C from scratch.
 
 <img src="./assets/demo.png" style="image-rendering:pixelated;" width="648" />
 
-## Pix16 API
+## API
 
 The functions provided to you are available here: [./src/game.h](./src/game.h)
 
